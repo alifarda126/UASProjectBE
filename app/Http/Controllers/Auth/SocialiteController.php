@@ -50,7 +50,7 @@ class SocialiteController extends Controller
      */
     public function handleProviderCallback(Request $request)
     {
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+        $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
 
         try {
             // Ambil data user dari Google
