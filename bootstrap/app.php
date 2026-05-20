@@ -32,7 +32,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         // Tambahkan CORS header untuk semua respons API
-        $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
+        // WAJIB prepend agar OPTIONS preflight ditangani sebelum middleware lain menolaknya
+        $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
 
         // ── Middleware tracking session ──
         $middleware->append(\App\Http\Middleware\TrackUserSession::class);
