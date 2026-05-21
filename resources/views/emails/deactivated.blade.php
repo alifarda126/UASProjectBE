@@ -26,7 +26,7 @@
             <p>Sistem kami mendeteksi bahwa tidak ada aktivitas di akun organisasi Anda selama lebih dari 30 hari. Untuk menjaga keamanan dan efisiensi sistem, akun organisasi Anda saat ini telah dinonaktifkan secara otomatis.</p>
             <p>Anda masih dapat mengakses akun Anda. Silakan masuk kembali ke dashboard MoneFlo dan klik tombol aktivasi untuk melanjutkan penggunaan.</p>
             <div class="btn-container">
-                <a href="{{ env('FRONTEND_URL', 'http://localhost:5173') }}/login" class="btn">Masuk & Aktifkan</a>
+                <a href="{{ config('app.frontend_url', 'http://localhost:5173') }}/login" class="btn">Masuk & Aktifkan</a>
             </div>
             <p>Jika Anda memiliki pertanyaan atau butuh bantuan, jangan ragu untuk membalas email ini.</p>
             <p>Terima kasih,<br><strong>Tim MoneFlo</strong></p>
