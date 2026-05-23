@@ -55,7 +55,7 @@ class SocialiteController extends Controller
      */
     public function handleProviderCallback(Request $request)
     {
-        // 1. Membaca URL Frontend dari env, jika tidak ada baru pakai fallback localhost
+        // Tetap dinamis membaca dari environment variable Railway
         $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
         $stateRaw = $request->query('state', '');
         
@@ -70,9 +70,9 @@ class SocialiteController extends Controller
         }
 
         try {
-            // 2. Membaca URL Redirect Backend secara otomatis dari config/env Laravel
+            // FORCE HARDCODE URL CALLBACK BACKEND DI SINI AGAR ANTI-CRASH
             $googleUser = Socialite::driver('google')
-                ->withRedirectUrl(config('services.google.redirect'))
+                ->withRedirectUrl('https://uasprojectbe-production.up.railway.app/api/auth/google/callback')
                 ->stateless()
                 ->user();
         } catch (\Exception $e) {
@@ -128,10 +128,10 @@ class SocialiteController extends Controller
                 minutes:  self::COOKIE_MINUTES,
                 path:     '/',
                 domain:   null,
-                secure:   $isProduction,   
+                secure:   true,   // Set true untuk HTTPS Railway
                 httpOnly: true,
                 raw:      false,
-                sameSite: $isProduction ? 'None' : 'Lax',  
+                sameSite: 'None', // Wajib None untuk lintas domain ke Cloudflare
             );
 
             return redirect("{$frontendUrl}/auth/callback?status=success&role={$user->role}")
