@@ -23,17 +23,3 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
-
-<IfModule mod_headers.c>
-    # Izinkan request dari frontend Cloudflare Pages
-    Header always set Access-Control-Allow-Origin "https://moneflo.pages.dev"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Accept, Content-Type, X-Requested-With, X-XSRF-TOKEN, Cookie, Authorization"
-    Header always set Access-Control-Allow-Credentials "true"
-
-    # Langsung balas OPTIONS preflight dengan 200 di level server
-    RewriteEngine On
-    RewriteCond %{REQUEST_METHOD} OPTIONS
-    RewriteRule ^(.*)$ $1 [R=200,L]
-</IfModule>
-

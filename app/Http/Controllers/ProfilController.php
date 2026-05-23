@@ -88,32 +88,47 @@ class ProfilController extends Controller
     {
         $user = $request->user();
 
-        // User OAuth tidak bisa ganti password
-        if ($user->provider === 'google') {
-            return response()->json(['message' => 'Akun Google tidak bisa mengubah password di sini'], 422);
-        }
-
-        // Cek apakah menggunakan OTP
-        if ($request->has('otp')) {
+        // Cek jika menggunakan Google Verification Token
+        if ($request->has('google_token')) {
+            $cachedToken = Cache::get('google_verify_' . $user->email);
+            if (!$cachedToken || $cachedToken !== $request->google_token) {
+                return response()->json(['message' => 'Sesi verifikasi Google tidak valid atau sudah kedaluwarsa. Silakan coba lagi.'], 400);
+            }
+            Cache::forget('google_verify_' . $user->email);
+            
             $request->validate([
-                'otp'      => 'required|string|size:6',
                 'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
             ]);
-
-            $cachedOtp = Cache::get('otp_' . $user->email);
-            if (!$cachedOtp || $cachedOtp !== $request->otp) {
-                return response()->json(['message' => 'Kode OTP tidak valid atau sudah kedaluwarsa.'], 400);
-            }
-            Cache::forget('otp_' . $user->email);
+            
+            // Jika token valid, user google diizinkan ganti password
         } else {
-            $request->validate([
-                'current_password' => 'required',
-                'password'         => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
-            ]);
+            // User OAuth biasa tidak bisa ganti password tanpa token
+            if ($user->provider === 'google') {
+                return response()->json(['message' => 'Akun Google tidak bisa mengubah password di sini'], 422);
+            }
 
-            // Verifikasi password lama
-            if (!Hash::check($request->current_password, $user->password ?? '')) {
-                return response()->json(['message' => 'Password lama tidak sesuai'], 422);
+            // Cek apakah menggunakan OTP
+            if ($request->has('otp')) {
+                $request->validate([
+                    'otp'      => 'required|string|size:6',
+                    'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+                ]);
+
+                $cachedOtp = Cache::get('otp_' . $user->email);
+                if (!$cachedOtp || $cachedOtp !== $request->otp) {
+                    return response()->json(['message' => 'Kode OTP tidak valid atau sudah kedaluwarsa.'], 400);
+                }
+                Cache::forget('otp_' . $user->email);
+            } else {
+                $request->validate([
+                    'current_password' => 'required',
+                    'password'         => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+                ]);
+
+                // Verifikasi password lama
+                if (!Hash::check($request->current_password, $user->password ?? '')) {
+                    return response()->json(['message' => 'Password lama tidak sesuai'], 422);
+                }
             }
         }
 

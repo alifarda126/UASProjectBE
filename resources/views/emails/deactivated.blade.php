@@ -11,7 +11,7 @@
         .content { padding: 40px 30px; }
         .content p { font-size: 16px; line-height: 1.6; margin-bottom: 20px; }
         .btn-container { text-align: center; margin: 30px 0; }
-        .btn { display: inline-block; padding: 14px 28px; background-color: #1e293b; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; transition: background-color 0.2s; }
+        .btn { display: inline-block; padding: 14px 30px; background-color: #0ea5e9; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px; letter-spacing: 0.3px; }
         .btn:hover { background-color: #0f172a; }
         .footer { text-align: center; padding: 20px; color: #94a3b8; font-size: 14px; border-top: 1px solid #f1f5f9; }
     </style>
@@ -26,7 +26,7 @@
             <p>Sistem kami mendeteksi bahwa tidak ada aktivitas di akun organisasi Anda selama lebih dari 30 hari. Untuk menjaga keamanan dan efisiensi sistem, akun organisasi Anda saat ini telah dinonaktifkan secara otomatis.</p>
             <p>Anda masih dapat mengakses akun Anda. Silakan masuk kembali ke dashboard MoneFlo dan klik tombol aktivasi untuk melanjutkan penggunaan.</p>
             <div class="btn-container">
-                <a href="{{ config('app.frontend_url', 'http://localhost:5173') }}/login" class="btn">Masuk & Aktifkan</a>
+                <a href="{{ env('FRONTEND_URL', 'http://localhost:5173') }}/login" class="btn">Masuk & Aktifkan</a>
             </div>
             <p>Jika Anda memiliki pertanyaan atau butuh bantuan, jangan ragu untuk membalas email ini.</p>
             <p>Terima kasih,<br><strong>Tim MoneFlo</strong></p>

@@ -177,14 +177,3 @@ Route::middleware(['auth.cookie'])->group(function () {
 
     });
 });
-
-/*
-|--------------------------------------------------------------------------
-| OPTIONS Fallback — CORS Preflight Handler
-|--------------------------------------------------------------------------
-| Tangkap semua preflight OPTIONS yang lolos dari HandleCors middleware.
-| Ini mencegah 405 Method Not Allowed pada request lintas domain.
-*/
-Route::options('/{any}', function () {
-    return response()->noContent(); // 204
-})->where('any', '.*');

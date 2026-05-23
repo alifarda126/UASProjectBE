@@ -36,11 +36,16 @@ class SocialiteController extends Controller
      * Redirect pengguna ke halaman consent Google OAuth.
      * Route: GET /api/auth/google/redirect
      */
-    public function redirectToProvider(): \Symfony\Component\HttpFoundation\RedirectResponse
+    public function redirectToProvider(Request $request): \Symfony\Component\HttpFoundation\RedirectResponse
     {
+        $action = $request->query('action', 'login');
+        $email = $request->query('email', '');
+        
+        $state = base64_encode(json_encode(['action' => $action, 'email' => $email]));
+
         return Socialite::driver('google')
             ->stateless()
-            ->with(['prompt' => 'select_account']) // Selalu tampilkan pilihan akun
+            ->with(['prompt' => 'select_account', 'state' => $state]) // Selalu tampilkan pilihan akun
             ->redirect();
     }
 
@@ -50,7 +55,18 @@ class SocialiteController extends Controller
      */
     public function handleProviderCallback(Request $request)
     {
-        $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+        $stateRaw = $request->query('state', '');
+        
+        $action = 'login';
+        $expectedEmail = '';
+        if ($stateRaw) {
+            $decoded = json_decode(base64_decode($stateRaw), true);
+            if (is_array($decoded)) {
+                $action = $decoded['action'] ?? 'login';
+                $expectedEmail = $decoded['email'] ?? '';
+            }
+        }
 
         try {
             // Ambil data user dari Google
@@ -58,6 +74,18 @@ class SocialiteController extends Controller
         } catch (\Exception $e) {
             return redirect("{$frontendUrl}/auth/callback?error=oauth_failed&message=" . urlencode($e->getMessage()));
         }
+
+        // --- Alur Khusus Verifikasi Ulang Google (Reset Password) ---
+        if ($action === 'verify_password') {
+            if ($googleUser->getEmail() !== $expectedEmail) {
+                return redirect("{$frontendUrl}/dashboard/pengaturan?google_verified=error&message=" . urlencode('Akun Google yang Anda pilih tidak cocok dengan akun saat ini.'));
+            }
+
+            $verifyToken = (string) rand(100000, 999999);
+            Cache::put('google_verify_' . $googleUser->getEmail(), $verifyToken, now()->addMinutes(10));
+            return redirect("{$frontendUrl}/dashboard/pengaturan?google_verified=true&token={$verifyToken}");
+        }
+        // -------------------------------------------------------------
 
         try {
             // Cari user berdasarkan provider_id atau email

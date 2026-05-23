@@ -257,6 +257,16 @@ class AdminOrganisasiController extends Controller
                 'link'    => '/dashboard/pengaturan',
             ]);
         }
+
+        // Kirim email penolakan banding ke email organisasi (jika ditolak)
+        if ($request->status === 'rejected' && $banding->organisasi && $banding->organisasi->email) {
+            try {
+                \Illuminate\Support\Facades\Mail::to($banding->organisasi->email)
+                    ->send(new \App\Mail\BandingRejectedMail($banding->organisasi->name, $request->admin_note));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Gagal kirim email banding rejected ke {$banding->organisasi->email}: " . $e->getMessage());
+            }
+        }
     
         return response()->json([
             'message' => 'Banding berhasil diproses',

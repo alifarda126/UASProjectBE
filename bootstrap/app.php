@@ -32,9 +32,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         // Tambahkan CORS header untuk semua respons API
-        // Custom middleware: handle OPTIONS preflight + tambah CORS headers ke response
-        // Lebih reliable dari HandleCors karena baca env langsung, tidak via config cache
-        $middleware->prepend(\App\Http\Middleware\HandleApiCors::class);
+        // WAJIB prepend agar OPTIONS preflight ditangani sebelum middleware lain menolaknya
+        $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
 
         // ── Middleware tracking session ──
         $middleware->append(\App\Http\Middleware\TrackUserSession::class);

@@ -115,6 +115,16 @@ class OrganisasiController extends Controller
             } elseif ($request->status === 'Non-aktif') {
                 $organisasi->is_active = false;
                 $organisasi->save();
+
+                // Kirim email penonaktifan jika sebelumnya aktif
+                if ($wasDeactivated === false && $organisasi->email) {
+                    try {
+                        \Illuminate\Support\Facades\Mail::to($organisasi->email)
+                            ->send(new \App\Mail\DeactivatedMail($organisasi->name));
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Gagal kirim email deactivated ke {$organisasi->email}: " . $e->getMessage());
+                    }
+                }
             }
         }
 
