@@ -55,6 +55,7 @@ class SocialiteController extends Controller
      */
     public function handleProviderCallback(Request $request)
     {
+        // 1. Membaca URL Frontend dari env, jika tidak ada baru pakai fallback localhost
         $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
         $stateRaw = $request->query('state', '');
         
@@ -69,8 +70,11 @@ class SocialiteController extends Controller
         }
 
         try {
-            // Ambil data user dari Google
-            $googleUser = Socialite::driver('google')->stateless()->user();
+            // 2. Membaca URL Redirect Backend secara otomatis dari config/env Laravel
+            $googleUser = Socialite::driver('google')
+                ->withRedirectUrl(config('services.google.redirect'))
+                ->stateless()
+                ->user();
         } catch (\Exception $e) {
             return redirect("{$frontendUrl}/auth/callback?error=oauth_failed&message=" . urlencode($e->getMessage()));
         }
@@ -94,44 +98,29 @@ class SocialiteController extends Controller
                         ->first();
 
             if (!$user) {
-                // Coba cari berdasarkan email (user mungkin sudah daftar manual)
                 $user = User::where('email', $googleUser->getEmail())->first();
             }
 
             if ($user) {
-                // Update data OAuth jika user sudah ada
                 $user->update([
                     'provider'       => 'google',
                     'provider_id'    => $googleUser->getId(),
                     'provider_token' => $googleUser->token,
-                    // Update avatar hanya jika belum ada custom avatar
                     'avatar'         => $user->avatar ?: $googleUser->getAvatar(),
                     'email_verified_at' => $user->email_verified_at ?? now(),
                 ]);
             } else {
-                // User belum terdaftar, arahkan ke form pendaftaran frontend
-                $name = urlencode($googleUser->getName());
-                $email = urlencode($googleUser->getEmail());
-                return redirect("{$frontendUrl}/register?email={$email}&name={$name}&oauth=true");
+                return redirect("{$frontendUrl}/register?email=" . urlencode($googleUser->getEmail()) . "&name=" . urlencode($googleUser->getName()) . "&oauth=true");
             }
 
-            // Cek apakah user aktif
             if (!$user->is_active) {
                 return redirect("{$frontendUrl}/auth/callback?error=account_inactive");
             }
 
-            // Update waktu login terakhir
             $user->updateLastLogin();
-
-            // Hapus token lama agar tidak menumpuk
             $user->tokens()->where('name', 'moneflo-app')->delete();
-
-            // Buat Sanctum API token baru
             $token = $user->createToken('moneflo-app')->plainTextToken;
 
-            // Set httpOnly cookie yang berisi token
-            // Di production: secure=true + SameSite=None WAJIB untuk cross-domain
-            // (Frontend Cloudflare Pages ≠ domain Backend DomCloud)
             $isProduction = app()->environment('production');
             $cookie = Cookie::make(
                 name:     self::COOKIE_NAME,
@@ -139,10 +128,10 @@ class SocialiteController extends Controller
                 minutes:  self::COOKIE_MINUTES,
                 path:     '/',
                 domain:   null,
-                secure:   $isProduction,   // true di production (HTTPS)
+                secure:   $isProduction,   
                 httpOnly: true,
                 raw:      false,
-                sameSite: $isProduction ? 'None' : 'Lax',  // None wajib untuk cross-domain
+                sameSite: $isProduction ? 'None' : 'Lax',  
             );
 
             return redirect("{$frontendUrl}/auth/callback?status=success&role={$user->role}")
