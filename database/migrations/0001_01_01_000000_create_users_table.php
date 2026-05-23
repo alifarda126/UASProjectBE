@@ -16,7 +16,18 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            
+            // Diubah jadi nullable karena user yang register via Google tidak punya password bawaan
+            $table->string('password')->nullable(); 
+
+            // --- KOLOM TAMBAHAN UNTUK GOOGLE OAUTH ---
+            $table->string('provider')->nullable();          // Menyimpan string 'google'
+            $table->string('provider_id')->nullable();       // Menyimpan ID unik user dari Google
+            $table->text('provider_token')->nullable();      // Menyimpan token OAuth dari Google
+            $table->string('avatar')->nullable();            // Menyimpan URL foto profil dari Google
+            $table->boolean('is_active')->default(true);     // Status keaktifan akun user
+            // -----------------------------------------
+
             $table->rememberToken();
             $table->timestamps();
         });
