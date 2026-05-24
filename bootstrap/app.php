@@ -36,7 +36,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
 
         // ── Middleware tracking session ──
-        $middleware->append(\App\Http\Middleware\TrackUserSession::class);
+        // Hanya jalankan di route yang butuh auth, bukan global
+        // (dipindah ke route group 'auth.cookie' di api.php)
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

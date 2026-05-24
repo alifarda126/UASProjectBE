@@ -54,7 +54,7 @@ Route::post('/auth/forgot-password', [\App\Http\Controllers\Auth\OtpController::
 /* ══════════════════════════════════════════════════
    PROTECTED ROUTES (Butuh autentikasi via cookie/token)
    ══════════════════════════════════════════════════ */
-Route::middleware(['auth.cookie'])->group(function () {
+Route::middleware(['auth.cookie', \App\Http\Middleware\TrackUserSession::class])->group(function () {
 
     // ── User & Logout ──────────────────────────────
     Route::get('/user',     [SocialiteController::class, 'getAuthenticatedUser'])->name('user.me');
