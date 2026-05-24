@@ -33,6 +33,27 @@ class SocialiteController extends Controller
     private const COOKIE_MINUTES = 60 * 24 * 7;
 
     /**
+     * Helper: Buat httpOnly cookie untuk Sanctum token.
+     * Di production (cross-domain Cloudflare↔Railway): Secure=true, SameSite=None WAJIB.
+     */
+    private function makeAuthCookie(string $token): \Symfony\Component\HttpFoundation\Cookie
+    {
+        $isProduction = app()->environment('production');
+
+        return Cookie::make(
+            name:     self::COOKIE_NAME,
+            value:    $token,
+            minutes:  self::COOKIE_MINUTES,
+            path:     '/',
+            domain:   null,                          // null → domain backend otomatis
+            secure:   $isProduction,                 // true di production (HTTPS)
+            httpOnly: true,
+            raw:      false,
+            sameSite: $isProduction ? 'None' : 'Lax', // None WAJIB untuk cross-domain
+        );
+    }
+
+    /**
      * Redirect pengguna ke halaman consent Google OAuth.
      * Route: GET /api/auth/google/redirect
      */
@@ -55,7 +76,6 @@ class SocialiteController extends Controller
      */
     public function handleProviderCallback(Request $request)
     {
-        // Tetap dinamis membaca dari environment variable Railway
         $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
         $stateRaw = $request->query('state', '');
         
@@ -70,11 +90,8 @@ class SocialiteController extends Controller
         }
 
         try {
-            // FORCE HARDCODE URL CALLBACK BACKEND DI SINI AGAR ANTI-CRASH
-            $googleUser = Socialite::driver('google')
-                ->withRedirectUrl('https://uasprojectbe-production.up.railway.app/api/auth/google/callback')
-                ->stateless()
-                ->user();
+            // Ambil data user dari Google
+            $googleUser = Socialite::driver('google')->stateless()->user();
         } catch (\Exception $e) {
             return redirect("{$frontendUrl}/auth/callback?error=oauth_failed&message=" . urlencode($e->getMessage()));
         }
@@ -98,41 +115,43 @@ class SocialiteController extends Controller
                         ->first();
 
             if (!$user) {
+                // Coba cari berdasarkan email (user mungkin sudah daftar manual)
                 $user = User::where('email', $googleUser->getEmail())->first();
             }
 
             if ($user) {
+                // Update data OAuth jika user sudah ada
                 $user->update([
                     'provider'       => 'google',
                     'provider_id'    => $googleUser->getId(),
                     'provider_token' => $googleUser->token,
+                    // Update avatar hanya jika belum ada custom avatar
                     'avatar'         => $user->avatar ?: $googleUser->getAvatar(),
                     'email_verified_at' => $user->email_verified_at ?? now(),
                 ]);
             } else {
-                return redirect("{$frontendUrl}/register?email=" . urlencode($googleUser->getEmail()) . "&name=" . urlencode($googleUser->getName()) . "&oauth=true");
+                // User belum terdaftar, arahkan ke form pendaftaran frontend
+                $name = urlencode($googleUser->getName());
+                $email = urlencode($googleUser->getEmail());
+                return redirect("{$frontendUrl}/register?email={$email}&name={$name}&oauth=true");
             }
 
+            // Cek apakah user aktif
             if (!$user->is_active) {
                 return redirect("{$frontendUrl}/auth/callback?error=account_inactive");
             }
 
+            // Update waktu login terakhir
             $user->updateLastLogin();
+
+            // Hapus token lama agar tidak menumpuk
             $user->tokens()->where('name', 'moneflo-app')->delete();
+
+            // Buat Sanctum API token baru
             $token = $user->createToken('moneflo-app')->plainTextToken;
 
-            $isProduction = app()->environment('production');
-            $cookie = Cookie::make(
-                name:     self::COOKIE_NAME,
-                value:    $token,
-                minutes:  self::COOKIE_MINUTES,
-                path:     '/',
-                domain:   null,
-                secure:   true,   // Set true untuk HTTPS Railway
-                httpOnly: true,
-                raw:      false,
-                sameSite: 'None', // Wajib None untuk lintas domain ke Cloudflare
-            );
+            // Set httpOnly cookie yang berisi token (cross-domain safe)
+            $cookie = $this->makeAuthCookie($token);
 
             return redirect("{$frontendUrl}/auth/callback?status=success&role={$user->role}")
                 ->withCookie($cookie);
@@ -256,18 +275,8 @@ class SocialiteController extends Controller
 
         $token = $user->createToken('moneflo-app')->plainTextToken;
 
-        $isProduction = app()->environment('production');
-        $cookie = Cookie::make(
-            name:     self::COOKIE_NAME,
-            value:    $token,
-            minutes:  60 * 24 * 7,
-            path:     '/',
-            domain:   null,
-            secure:   $isProduction,
-            httpOnly: true,
-            raw:      false,
-            sameSite: $isProduction ? 'None' : 'Lax',
-        );
+        // Set httpOnly cookie yang berisi token (cross-domain safe)
+        $cookie = $this->makeAuthCookie($token);
 
         return response()->json([
             'message' => 'Login berhasil',

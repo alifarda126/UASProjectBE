@@ -18,9 +18,12 @@ return [
     'paths'                    => ['api/*', 'sanctum/csrf-cookie'],
     'allowed_methods'          => ['*'],
     'allowed_origins'          => array_values($origins),
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        // ✅ Izinkan semua preview deployment Cloudflare Pages
+        '#^https://[a-z0-9-]+\.moneflo\.pages\.dev$#',
+    ],
     'allowed_headers'          => ['*'],
     'exposed_headers'          => ['Content-Disposition'], // Untuk download file
-    'max_age'                  => 0,
+    'max_age'                  => 86400, // ✅ Cache preflight 24 jam — kurangi request OPTIONS berulang
     'supports_credentials'     => true, // WAJIB untuk cookie/session lintas domain
 ];

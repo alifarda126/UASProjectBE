@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\URL; // <-- WAJIB ADA UNTUK FORCE HTTPS
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,7 +19,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Langsung paksa semua aset, route, dan redirect Socialite menggunakan HTTPS secara absolut
-        URL::forceScheme('https');
+        //
     }
 }
