@@ -15,11 +15,11 @@ class AdminSeeder extends Seeder
     {
         // ── Admin Default ──
         User::updateOrCreate(
-            ['email' => 'moneflosupport@gmail.com'],
+            ['email' => 'moneflosupp@gmail.com'],
             [
                 'name'              => 'Super Admin',
-                'email'             => 'moneflosupport@gmail.com',
-                'password'          => Hash::make('admin123'),
+                'email'             => 'moneflosupp@gmail.com',
+                'password'          => Hash::make('Admin123'),
                 'role'              => 'admin',
                 'is_active'         => true,
                 'email_verified_at' => now(),
