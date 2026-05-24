@@ -22,6 +22,6 @@ class DatabaseSeeder extends Seeder
 
         $this->command->info('');
         $this->command->info('🎉 Semua seeder berhasil dijalankan!');
-        $this->command->info('   Admin: moneflosupport@gmail.com / admin123');
+        $this->command->info('   Admin: moneflosupp@gmail.com / Admin123');
     }
 }
