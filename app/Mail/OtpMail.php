@@ -17,12 +17,12 @@ class OtpMail extends Mailable implements ShouldQueue
     /**
      * The number of times the job may be attempted.
      */
-    public int $tries = 3;
+    public int $tries = 2;
 
     /**
      * The number of seconds to wait before retrying the job.
      */
-    public int $backoff = 10;
+    public int $backoff = 5;
 
     public string $otp;
     public string $action;
@@ -34,6 +34,7 @@ class OtpMail extends Mailable implements ShouldQueue
     {
         $this->otp    = $otp;
         $this->action = $action;
+        $this->onQueue('emails');
     }
 
     /**

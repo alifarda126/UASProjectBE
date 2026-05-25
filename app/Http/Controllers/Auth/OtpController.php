@@ -15,11 +15,6 @@ use Illuminate\Support\Facades\Mail;
 class OtpController extends Controller
 {
     /**
-     * Maximum synchronous send attempts before giving up.
-     */
-    private const MAX_SEND_ATTEMPTS = 2;
-
-    /**
      * Send OTP to the specified email.
      * Route: POST /api/auth/send-otp
      */
@@ -39,40 +34,17 @@ class OtpController extends Controller
         // Persist OTP in cache for 5 minutes (overwrites any previous OTP for this email)
         Cache::put('otp_' . $email, $otp, now()->addMinutes(5));
 
-        // Attempt to dispatch the queued mail; fall back to synchronous send on failure
-        $sent    = false;
-        $lastErr = null;
-
-        for ($attempt = 1; $attempt <= self::MAX_SEND_ATTEMPTS; $attempt++) {
-            try {
-                Mail::to($email)->send(new OtpMail($otp, $action));
-                $sent = true;
-                break;
-            } catch (\Exception $e) {
-                $lastErr = $e;
-                Log::warning('OTP mail attempt failed', [
-                    'attempt' => $attempt,
-                    'email'   => $email,
-                    'action'  => $action,
-                    'error'   => $e->getMessage(),
-                    'trace'   => $e->getTraceAsString(),
-                ]);
-
-                // Brief pause before retrying (skip on last attempt)
-                if ($attempt < self::MAX_SEND_ATTEMPTS) {
-                    sleep(1);
-                }
-            }
-        }
-
-        if (!$sent) {
+        // Dispatch OTP mail to queue (non-blocking) to avoid SMTP timeout on the HTTP request
+        try {
+            Mail::to($email)->queue(new OtpMail($otp, $action));
+        } catch (\Exception $e) {
             // Remove the cached OTP so a stale code is never accepted
             Cache::forget('otp_' . $email);
 
-            Log::error('OTP mail delivery failed after all attempts', [
+            Log::error('OTP mail queue dispatch failed', [
                 'email'  => $email,
                 'action' => $action,
-                'error'  => $lastErr?->getMessage(),
+                'error'  => $e->getMessage(),
             ]);
 
             return response()->json([
@@ -80,7 +52,7 @@ class OtpController extends Controller
             ], 500);
         }
 
-        Log::info('OTP mail dispatched successfully', [
+        Log::info('OTP mail queued successfully', [
             'email'  => $email,
             'action' => $action,
         ]);
