@@ -47,7 +47,7 @@ class AdminOrganisasiController extends Controller
                     if ($org->email) {
                         try {
                             \Illuminate\Support\Facades\Mail::to($org->email)
-                                ->send(new \App\Mail\DeactivatedMail($org->name));
+                                ->queue(new \App\Mail\DeactivatedMail($org->name));
                         } catch (\Exception $e) {
                             \Illuminate\Support\Facades\Log::error("Gagal kirim email deactivation ke {$org->email}: " . $e->getMessage());
                         }
@@ -132,7 +132,7 @@ class AdminOrganisasiController extends Controller
         if ($organisasi->email) {
             try {
                 \Illuminate\Support\Facades\Mail::to($organisasi->email)
-                    ->send(new \App\Mail\SuspendedMail($organisasi->name, $request->reason));
+                    ->queue(new \App\Mail\SuspendedMail($organisasi->name, $request->reason));
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error("Gagal kirim email suspend ke {$organisasi->email}: " . $e->getMessage());
             }
@@ -169,7 +169,7 @@ class AdminOrganisasiController extends Controller
         if ($organisasi->email) {
             try {
                 \Illuminate\Support\Facades\Mail::to($organisasi->email)
-                    ->send(new \App\Mail\ReactivatedMail($organisasi->name));
+                    ->queue(new \App\Mail\ReactivatedMail($organisasi->name));
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error("Gagal kirim email reactivated ke {$organisasi->email}: " . $e->getMessage());
             }
@@ -234,7 +234,7 @@ class AdminOrganisasiController extends Controller
             if ($banding->organisasi->email) {
                 try {
                     \Illuminate\Support\Facades\Mail::to($banding->organisasi->email)
-                        ->send(new \App\Mail\ReactivatedMail($banding->organisasi->name));
+                        ->queue(new \App\Mail\ReactivatedMail($banding->organisasi->name));
                 } catch (\Exception $e) {
                     \Illuminate\Support\Facades\Log::error("Gagal kirim email reactivated ke {$banding->organisasi->email}: " . $e->getMessage());
                 }
@@ -262,7 +262,7 @@ class AdminOrganisasiController extends Controller
         if ($request->status === 'rejected' && $banding->organisasi && $banding->organisasi->email) {
             try {
                 \Illuminate\Support\Facades\Mail::to($banding->organisasi->email)
-                    ->send(new \App\Mail\BandingRejectedMail($banding->organisasi->name, $request->admin_note));
+                    ->queue(new \App\Mail\BandingRejectedMail($banding->organisasi->name, $request->admin_note));
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error("Gagal kirim email banding rejected ke {$banding->organisasi->email}: " . $e->getMessage());
             }
@@ -380,7 +380,7 @@ class AdminOrganisasiController extends Controller
                 
                 try {
                     \Illuminate\Support\Facades\Mail::to($user->email)
-                        ->send(new \App\Mail\AnnouncementMail($settings['announcement'], $settings['appName'] ?? 'MoneFlo'));
+                        ->queue(new \App\Mail\AnnouncementMail($settings['announcement'], $settings['appName'] ?? 'MoneFlo'));
                 } catch (\Exception $e) {
                     \Illuminate\Support\Facades\Log::error("Gagal kirim email pengumuman ke {$user->email}: " . $e->getMessage());
                 }
