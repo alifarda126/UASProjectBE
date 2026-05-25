@@ -14,6 +14,8 @@ use App\Http\Controllers\BandingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\KasAnggotaController;
 use App\Http\Controllers\ProgramAnggaranController;
+use App\Mail\TestMail;
+use Illuminate\Support\Facades\Mail;
 
 /*
 |--------------------------------------------------------------------------
@@ -50,6 +52,27 @@ Route::post('/auth/verify-otp',      [\App\Http\Controllers\Auth\OtpController::
 
 // Reset password via OTP (Lupa Kata Sandi)
 Route::post('/auth/forgot-password', [\App\Http\Controllers\Auth\OtpController::class, 'resetPassword'])->name('auth.forgot-password');
+
+/* ══════════════════════════════════════════════════
+   TEST ROUTES (Publik — Hanya untuk keperluan testing)
+   ══════════════════════════════════════════════════ */
+
+// Test email endpoint — verifikasi konfigurasi SMTP Gmail
+Route::get('/test-email', function () {
+    try {
+        Mail::to('moneflosupp@gmail.com')->send(new TestMail());
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Test email sent successfully to moneflosupp@gmail.com',
+        ], 200);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => 'Failed to send test email: ' . $e->getMessage(),
+        ], 500);
+    }
+})->name('test.email');
 
 /* ══════════════════════════════════════════════════
    PROTECTED ROUTES (Butuh autentikasi via cookie/token)
