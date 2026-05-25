@@ -3,44 +3,81 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class OtpMail extends Mailable
+class OtpMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public $otp;
-    public $action;
+    /**
+     * The number of times the job may be attempted.
+     */
+    public int $tries = 3;
+
+    /**
+     * The number of seconds to wait before retrying the job.
+     */
+    public int $backoff = 10;
+
+    public string $otp;
+    public string $action;
 
     /**
      * Create a new message instance.
-     *
-     * @return void
      */
-    public function __construct($otp, $action)
+    public function __construct(string $otp, string $action)
     {
-        $this->otp = $otp;
+        $this->otp    = $otp;
         $this->action = $action;
     }
 
     /**
-     * Build the message.
-     *
-     * @return $this
+     * Get the message envelope.
      */
-    public function build()
+    public function envelope(): Envelope
     {
-        $subject = 'Kode Verifikasi Anda';
-        if ($this->action === 'register') {
-            $subject = 'Kode Verifikasi Registrasi MoneFlo';
-        } elseif ($this->action === 'update_email') {
-            $subject = 'Kode Verifikasi Perubahan Email MoneFlo';
-        } elseif ($this->action === 'forgot_password') {
-            $subject = 'Kode Pemulihan Kata Sandi MoneFlo';
-        }
+        $subject = match ($this->action) {
+            'register'       => 'Kode Verifikasi Registrasi MoneFlo',
+            'update_email'   => 'Kode Verifikasi Perubahan Email MoneFlo',
+            'forgot_password' => 'Kode Pemulihan Kata Sandi MoneFlo',
+            default          => 'Kode Verifikasi Anda – MoneFlo',
+        };
 
-        return $this->subject($subject)
-                    ->view('emails.otp');
+        return new Envelope(
+            from: new Address(
+                config('mail.from.address', 'noreply@moneflo.com'),
+                config('mail.from.name', 'MoneFlo')
+            ),
+            subject: $subject,
+        );
+    }
+
+    /**
+     * Get the message content definition.
+     */
+    public function content(): Content
+    {
+        return new Content(
+            view: 'emails.otp',
+            with: [
+                'otp'    => $this->otp,
+                'action' => $this->action,
+            ],
+        );
+    }
+
+    /**
+     * Get the attachments for the message.
+     *
+     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     */
+    public function attachments(): array
+    {
+        return [];
     }
 }
