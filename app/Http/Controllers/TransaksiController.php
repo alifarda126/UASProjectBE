@@ -88,19 +88,26 @@ class TransaksiController extends Controller
             return response()->json(['message' => 'Organisasi tidak ditemukan atau Anda bukan anggota'], 403);
         }
 
-        $transaksi = Transaksi::create([
-            ...$validated,
-            'user_id'     => $user->id,
-            'status'      => 'approved',  // ✅ Langsung approved
-            'approved_by' => $user->id,
-            'approved_at' => now(),
-            'docs'        => $validated['docs'] ?? [],
-        ]);
+        try {
+            $transaksi = Transaksi::create([
+                ...$validated,
+                'user_id'     => $user->id,
+                'status'      => 'approved',  // ✅ Langsung approved
+                'approved_by' => $user->id,
+                'approved_at' => now(),
+                'docs'        => $validated['docs'] ?? [],
+            ]);
 
-        return response()->json([
-            'message' => 'Transaksi berhasil dibuat',
-            'data'    => $this->formatTransaksi($transaksi->fresh(['user', 'approver'])),
-        ], 201);
+            return response()->json([
+                'message' => 'Transaksi berhasil dibuat',
+                'data'    => $this->formatTransaksi($transaksi->fresh(['user', 'approver'])),
+            ], 201);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Transaksi store error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Gagal menyimpan transaksi: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /** Detail transaksi */
@@ -217,13 +224,13 @@ class TransaksiController extends Controller
             'type'        => $t->type,
             'category'    => $t->category,
             'description' => $t->description,
-            'amount'      => $t->amount,
-            'date'        => $t->date?->toDateString(),
+            'amount'      => (float) $t->amount,
+            'date'        => $t->date ? \Carbon\Carbon::parse($t->date)->toDateString() : null,
             'status'      => $t->status,
             'notes'       => $t->notes,
-            'docs'        => $t->docs ?? [],   // ✅ Array bukti transaksi
-            'created_at'  => $t->created_at?->toISOString(),
-            'approved_at' => $t->approved_at?->toISOString(),
+            'docs'        => is_string($t->docs) ? json_decode($t->docs, true) : ($t->docs ?? []),
+            'created_at'  => $t->created_at ? \Carbon\Carbon::parse($t->created_at)->toISOString() : null,
+            'approved_at' => $t->approved_at ? \Carbon\Carbon::parse($t->approved_at)->toISOString() : null,
             'user'        => $t->user ? ['id' => $t->user->id, 'name' => $t->user->name] : null,
             'approver'    => $t->approver ? ['id' => $t->approver->id, 'name' => $t->approver->name] : null,
         ];
