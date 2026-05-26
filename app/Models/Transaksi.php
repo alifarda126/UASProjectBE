@@ -55,9 +55,17 @@ class Transaksi extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Relasi ke user yang menyetujui transaksi.
+     * withDefault() mencegah error 500 saat approved_by = NULL
+     */
     public function approver()
     {
-        return $this->belongsTo(User::class, 'approved_by');
+        return $this->belongsTo(User::class, 'approved_by')->withDefault([
+            'id' => 0,
+            'name' => 'System',
+            'avatar' => null,
+        ]);
     }
 
     /* ──────────────────────────────────────
