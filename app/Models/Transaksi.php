@@ -31,15 +31,12 @@ class Transaksi extends Model
         'approved_at',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'amount'      => 'float',
-            'date'        => 'date',
-            'approved_at' => 'datetime',
-            'docs'        => 'array',   // JSON array of bukti files
-        ];
-    }
+    protected $casts = [
+        'amount'      => 'float',
+        'date'        => 'date',
+        'approved_at' => 'datetime',
+        'docs'        => 'array',   // JSON array of bukti files
+    ];
 
     /* ──────────────────────────────────────
      * RELASI

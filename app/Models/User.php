@@ -35,15 +35,12 @@ class User extends Authenticatable
         'provider_token',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'last_login_at'     => 'datetime',
-            'password'          => 'hashed',
-            'is_active'         => 'boolean',
-        ];
-    }
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'last_login_at'     => 'datetime',
+        'password'          => 'hashed',
+        'is_active'         => 'boolean',
+    ];
 
     /* ──────────────────────────────────────
      * RELASI

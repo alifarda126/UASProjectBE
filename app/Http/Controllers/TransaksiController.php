@@ -16,52 +16,60 @@ class TransaksiController extends Controller
     /** List transaksi dengan filter */
     public function index(Request $request): JsonResponse
     {
-        $user         = $request->user();
-        $organisasiId = $request->get('organisasi_id');
-        $organisasi   = $this->getOrganisasi($user, $organisasiId);
+        try {
+            $user         = $request->user();
+            $organisasiId = $request->get('organisasi_id');
+            $organisasi   = $this->getOrganisasi($user, $organisasiId);
 
-        if (!$organisasi) {
-            return response()->json(['data' => [], 'meta' => []]);
-        }
+            if (!$organisasi) {
+                return response()->json(['data' => [], 'meta' => []]);
+            }
 
-        $query = $organisasi->transaksi()->with(['user:id,name,avatar', 'approver:id,name']);
+            $query = $organisasi->transaksi()->with(['user:id,name,avatar', 'approver:id,name']);
 
-        // Filter type
-        if ($request->has('type') && in_array($request->type, ['pemasukan', 'pengeluaran'])) {
-            $query->where('type', $request->type);
-        }
-        // Filter status
-        if ($request->has('status') && in_array($request->status, ['pending', 'approved', 'rejected'])) {
-            $query->where('status', $request->status);
-        }
-        // Filter kategori
-        if ($request->has('category')) {
-            $query->where('category', 'like', '%' . $request->category . '%');
-        }
-        // Filter tanggal
-        if ($request->has('date_from')) {
-            $query->whereDate('date', '>=', $request->date_from);
-        }
-        if ($request->has('date_to')) {
-            $query->whereDate('date', '<=', $request->date_to);
-        }
-        // Pencarian
-        if ($request->has('search')) {
-            $query->where('description', 'like', '%' . $request->search . '%');
-        }
+            // Filter type
+            if ($request->has('type') && in_array($request->type, ['pemasukan', 'pengeluaran'])) {
+                $query->where('type', $request->type);
+            }
+            // Filter status
+            if ($request->has('status') && in_array($request->status, ['pending', 'approved', 'rejected'])) {
+                $query->where('status', $request->status);
+            }
+            // Filter kategori
+            if ($request->has('category')) {
+                $query->where('category', 'like', '%' . $request->category . '%');
+            }
+            // Filter tanggal
+            if ($request->has('date_from')) {
+                $query->whereDate('date', '>=', $request->date_from);
+            }
+            if ($request->has('date_to')) {
+                $query->whereDate('date', '<=', $request->date_to);
+            }
+            // Pencarian
+            if ($request->has('search')) {
+                $query->where('description', 'like', '%' . $request->search . '%');
+            }
 
-        $transaksi = $query->orderBy('date', 'desc')
-            ->paginate($request->get('per_page', 15));
+            $transaksi = $query->orderBy('date', 'desc')
+                ->paginate($request->get('per_page', 15));
 
-        return response()->json([
-            'data' => collect($transaksi->items())->map(fn($t) => $this->formatTransaksi($t)),
-            'meta' => [
-                'total'        => $transaksi->total(),
-                'current_page' => $transaksi->currentPage(),
-                'last_page'    => $transaksi->lastPage(),
-                'per_page'     => $transaksi->perPage(),
-            ],
-        ]);
+            return response()->json([
+                'data' => collect($transaksi->items())->map(fn($t) => $this->formatTransaksi($t)),
+                'meta' => [
+                    'total'        => $transaksi->total(),
+                    'current_page' => $transaksi->currentPage(),
+                    'last_page'    => $transaksi->lastPage(),
+                    'per_page'     => $transaksi->perPage(),
+                ]
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Debug 500: ' . $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
+        }
     }
 
     /** Buat transaksi baru */
@@ -102,10 +110,13 @@ class TransaksiController extends Controller
                 'message' => 'Transaksi berhasil dibuat',
                 'data'    => $this->formatTransaksi($transaksi->fresh(['user', 'approver'])),
             ], 201);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Transaksi store error: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Gagal menyimpan transaksi: ' . $e->getMessage()
+                'message' => 'Gagal menyimpan transaksi',
+                'debug' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ], 500);
         }
     }

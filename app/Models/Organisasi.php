@@ -34,16 +34,13 @@ class Organisasi extends Model
         'dues_amount',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'is_active'    => 'boolean',
-            'is_suspended' => 'boolean',
-            'suspended_at' => 'datetime',
-            'dues_interval' => 'integer',
-            'dues_amount' => 'decimal:2',
-        ];
-    }
+    protected $casts = [
+        'is_active'    => 'boolean',
+        'is_suspended' => 'boolean',
+        'suspended_at' => 'datetime',
+        'dues_interval' => 'integer',
+        'dues_amount' => 'decimal:2',
+    ];
 
     /* ──────────────────────────────────────
      * RELASI
