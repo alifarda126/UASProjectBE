@@ -25,6 +25,16 @@ class OtpController extends Controller
         $email = $request->email;
         $action = $request->action;
 
+        // Jika action forgot_password, pastikan email sudah terdaftar
+        if ($action === 'forgot_password') {
+            $userExists = \App\Models\User::where('email', $email)->exists();
+            if (!$userExists) {
+                return response()->json([
+                    'message' => 'Email tidak terdaftar. Periksa kembali email Anda.'
+                ], 404);
+            }
+        }
+
         // Generate a 6-digit OTP
         $otp = (string) rand(100000, 999999);
 
