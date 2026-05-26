@@ -51,16 +51,32 @@ class TransaksiController extends Controller
                 $query->where('description', 'like', '%' . $request->search . '%');
             }
 
-            $transaksi = $query->orderBy('date', 'desc')
+            // 1. Ambil IDs terlebih dahulu untuk menghindari MySQL Out of Sort Memory
+            // (disebabkan oleh kolom `docs` yang berisi LONGTEXT base64)
+            $paginator = $query->select('transaksi.id')
+                ->orderBy('date', 'desc')
                 ->paginate($request->get('per_page', 15));
 
+            $ids = collect($paginator->items())->pluck('id')->toArray();
+
+            // 2. Ambil data lengkap berdasarkan IDs, beserta relasinya
+            $fullModels = Transaksi::with(['user:id,name,avatar', 'approver:id,name'])
+                ->whereIn('id', $ids)
+                ->get()
+                ->keyBy('id');
+
+            // 3. Gabungkan kembali sesuai urutan dari paginator
+            $transaksiItems = collect($paginator->items())->map(function($t) use ($fullModels) {
+                return $fullModels[$t->id] ?? null;
+            })->filter()->values();
+
             return response()->json([
-                'data' => collect($transaksi->items())->map(fn($t) => $this->formatTransaksi($t)),
+                'data' => $transaksiItems->map(fn($t) => $this->formatTransaksi($t)),
                 'meta' => [
-                    'total'        => $transaksi->total(),
-                    'current_page' => $transaksi->currentPage(),
-                    'last_page'    => $transaksi->lastPage(),
-                    'per_page'     => $transaksi->perPage(),
+                    'total'        => $paginator->total(),
+                    'current_page' => $paginator->currentPage(),
+                    'last_page'    => $paginator->lastPage(),
+                    'per_page'     => $paginator->perPage(),
                 ]
             ]);
         } catch (\Throwable $e) {
