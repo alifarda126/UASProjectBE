@@ -2,28 +2,36 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use ZipArchive;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-// Route Darurat Pemindahan Data ke Storj
-Route::get('/pindah-data-rahasia', function () {
-    // 1. Ambil semua file dari folder storage lokal server Clever Cloud
-    $files = Storage::disk('local')->allFiles('public');
-    
-    $pindah = 0;
-    foreach ($files as $file) {
-        // Baca isi file-nya
-        $content = Storage::disk('local')->get($file);
-        
-        // Bersihkan path (menghilangkan kata 'public/' di depannya agar rapi di Storj)
-        $cleanPath = str_replace('public/', '', $file);
-        
-        // 2. Upload langsung ke Storj (disk s3)
-        Storage::disk('s3')->put($cleanPath, $content);
-        $pindah++;
+// Route Darurat: Download semua isi storage/app/public dalam bentuk ZIP
+Route::get('/download-semua-data', function () {
+    $zip = new ZipArchive;
+    $zipFileName = 'backup_storage_' . date('Y-m-d_His') . '.zip';
+    $zipPath = storage_path($zipFileName);
+
+    // Membuka/Membuat file ZIP
+    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+        // Mengambil semua file dari folder 'public' (storage/app/public)
+        $files = Storage::disk('public')->allFiles();
+
+        foreach ($files as $file) {
+            // Menambahkan file ke dalam ZIP
+            // Menggunakan path absolut untuk memastikan file ditemukan
+            $zip->addFile(storage_path('app/public/' . $file), $file);
+        }
+        $zip->close();
     }
 
-    return "Mantap! " . $pindah . " file berhasil dipindahkan ke Storj.";
+    // Cek apakah file zip berhasil dibuat
+    if (file_exists($zipPath)) {
+        // Mengirim file ke browser dan menghapus file setelah selesai diunduh
+        return response()->download($zipPath)->deleteFileAfterSend(true);
+    }
+
+    return "Gagal membuat file ZIP. Pastikan ada file di dalam folder storage.";
 });
