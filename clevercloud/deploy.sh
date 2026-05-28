@@ -15,8 +15,8 @@ echo "🚀 [Clever Cloud Hook] Starting post-deployment tasks..."
 # Install dependencies production
 composer install --no-dev --optimize-autoloader --no-interaction
 
-# Generate key jika belum ada
-php artisan key:generate --no-interaction --force
+# Note: APP_KEY harus di-set melalui menu Environment Variables di Clever Cloud.
+# Jangan gunakan php artisan key:generate di sini karena file .env tidak ada.
 
 # Jalankan migrasi
 echo "🗄️ Running migrations..."
