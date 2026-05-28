@@ -14,6 +14,7 @@ use App\Http\Controllers\BandingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\KasAnggotaController;
 use App\Http\Controllers\ProgramAnggaranController;
+use App\Http\Controllers\UploadController;
 
 /*
 |--------------------------------------------------------------------------
@@ -93,6 +94,11 @@ Route::middleware(['auth.cookie', \App\Http\Middleware\TrackUserSession::class])
     Route::post('/transaksi/{transaksi}/approve',   [TransaksiController::class, 'approve'])->name('transaksi.approve');
     Route::post('/transaksi/{transaksi}/reject',    [TransaksiController::class, 'reject'])->name('transaksi.reject');
     Route::get('/transaksi-export',                  [TransaksiController::class, 'export'])->name('transaksi.export');
+
+    // ── Upload Dokumen/Foto ke S3 ──────────────────
+    // Gambar (JPG/PNG/WEBP): maks. 2MB | Dokumen (PDF/DOC/DOCX): maks. 5MB | Maks. 5 file
+    Route::post('/upload/doc',    [UploadController::class, 'uploadDocs'])->name('upload.doc');
+    Route::delete('/upload/doc',  [UploadController::class, 'deleteDocs'])->name('upload.doc.delete');
 
     // ── Laporan ────────────────────────────────────
     Route::prefix('laporan')->name('laporan.')->group(function () {

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Model User — entitas utama pengguna aplikasi MoneFlo.
@@ -110,8 +111,10 @@ class User extends Authenticatable
     public function getAvatarUrlAttribute(): ?string
     {
         if (!$this->avatar) return null;
+        // URL eksternal (Google OAuth, dsb) — langsung dikembalikan
         if (str_starts_with($this->avatar, 'http')) return $this->avatar;
-        return asset('storage/' . $this->avatar);
+        // Path file lokal/S3 — generate URL via Storage facade
+        return Storage::url($this->avatar);
     }
 
     /** Inisial nama untuk placeholder avatar */

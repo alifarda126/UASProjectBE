@@ -141,18 +141,20 @@ class ProfilController extends Controller
     public function uploadAvatar(Request $request): JsonResponse
     {
         $request->validate([
-            'avatar' => 'required|image|mimes:jpeg,png,jpg,webp|max:2048', // Max 2MB
+            // Gambar: JPG/PNG/WEBP, maks. 2MB
+            'avatar' => 'required|image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
         $user = $request->user();
+        $disk = config('filesystems.default');
 
         // Hapus avatar lama jika ada dan bukan URL eksternal
         if ($user->avatar && !str_starts_with($user->avatar, 'http')) {
-            Storage::disk('public')->delete($user->avatar);
+            Storage::disk($disk)->delete($user->avatar);
         }
 
-        // Simpan avatar baru
-        $path = $request->file('avatar')->store('avatars', 'public');
+        // Simpan avatar baru ke disk aktif (S3 atau local)
+        $path = $request->file('avatar')->store('avatars', $disk);
         $user->update(['avatar' => $path]);
 
         return response()->json([

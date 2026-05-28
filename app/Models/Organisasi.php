@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\KasAnggota;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Model Organisasi — entitas organisasi yang mengelola keuangan.
@@ -120,7 +121,9 @@ class Organisasi extends Model
     public function getLogoUrlAttribute(): ?string
     {
         if (!$this->logo) return null;
+        // URL eksternal — langsung dikembalikan
         if (str_starts_with($this->logo, 'http')) return $this->logo;
-        return asset('storage/' . $this->logo);
+        // Path file lokal/S3 — generate URL via Storage facade
+        return Storage::url($this->logo);
     }
 }

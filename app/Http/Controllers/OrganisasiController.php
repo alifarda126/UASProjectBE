@@ -137,16 +137,19 @@ class OrganisasiController extends Controller
         $this->authorizeOrganisasiAccess($request->user(), $organisasi);
 
         $request->validate([
-            'logo' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            // Gambar: JPG/PNG/WEBP/GIF, maks. 2MB
+            'logo' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
+
+        $disk = config('filesystems.default');
 
         // Hapus logo lama jika ada (dan bukan URL eksternal)
         if ($organisasi->logo && !str_starts_with($organisasi->logo, 'http')) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($organisasi->logo);
+            \Illuminate\Support\Facades\Storage::disk($disk)->delete($organisasi->logo);
         }
 
-        // Simpan file baru
-        $path = $request->file('logo')->store('logos', 'public');
+        // Simpan file baru ke disk aktif (S3 atau local)
+        $path = $request->file('logo')->store('logos', $disk);
         $organisasi->update(['logo' => $path]);
 
         return response()->json([
@@ -160,9 +163,11 @@ class OrganisasiController extends Controller
     {
         $this->authorizeOrganisasiAccess($request->user(), $organisasi);
 
+        $disk = config('filesystems.default');
+
         // Hapus file dari storage jika ada
         if ($organisasi->logo && !str_starts_with($organisasi->logo, 'http')) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($organisasi->logo);
+            \Illuminate\Support\Facades\Storage::disk($disk)->delete($organisasi->logo);
         }
 
         $organisasi->update(['logo' => null]);

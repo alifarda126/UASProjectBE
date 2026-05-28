@@ -92,17 +92,19 @@ class TransaksiController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'organisasi_id' => 'required|exists:organisasi,id',
-            'type'          => 'required|in:pemasukan,pengeluaran',
-            'category'      => 'required|string|max:100',
-            'description'   => 'required|string|max:500',
-            'amount'        => 'required|numeric|min:1',
-            'date'          => 'required|date',
-            'notes'         => 'nullable|string',
-            'docs'          => 'nullable|array',
-            'docs.*.name'   => 'required_with:docs|string|max:255',
-            'docs.*.type'   => 'required_with:docs|string|max:100',
-            'docs.*.dataUrl'=> 'required_with:docs|string',
+            'organisasi_id'     => 'required|exists:organisasi,id',
+            'type'              => 'required|in:pemasukan,pengeluaran',
+            'category'          => 'required|string|max:100',
+            'description'       => 'required|string|max:500',
+            'amount'            => 'required|numeric|min:1',
+            'date'              => 'required|date',
+            'notes'             => 'nullable|string',
+            // docs: array of file metadata (URL-based, hasil upload ke S3)
+            'docs'              => 'nullable|array|max:5',
+            'docs.*.url'        => 'required_with:docs|string|url',
+            'docs.*.name'       => 'required_with:docs|string|max:255',
+            'docs.*.mime_type'  => 'required_with:docs|string|max:100',
+            'docs.*.size'       => 'required_with:docs|integer|min:0',
         ]);
 
         $user       = $request->user();
@@ -152,16 +154,18 @@ class TransaksiController extends Controller
         $this->authorizeTransaksiAccess($request->user(), $transaksi);
 
         $validated = $request->validate([
-            'type'          => 'sometimes|in:pemasukan,pengeluaran',
-            'category'      => 'sometimes|string|max:100',
-            'description'   => 'sometimes|string|max:500',
-            'amount'        => 'sometimes|numeric|min:1',
-            'date'          => 'sometimes|date',
-            'notes'         => 'nullable|string',
-            'docs'          => 'nullable|array',
-            'docs.*.name'   => 'required_with:docs|string|max:255',
-            'docs.*.type'   => 'required_with:docs|string|max:100',
-            'docs.*.dataUrl'=> 'required_with:docs|string',
+            'type'              => 'sometimes|in:pemasukan,pengeluaran',
+            'category'          => 'sometimes|string|max:100',
+            'description'       => 'sometimes|string|max:500',
+            'amount'            => 'sometimes|numeric|min:1',
+            'date'              => 'sometimes|date',
+            'notes'             => 'nullable|string',
+            // docs: array of file metadata (URL-based, hasil upload ke S3)
+            'docs'              => 'nullable|array|max:5',
+            'docs.*.url'        => 'required_with:docs|string|url',
+            'docs.*.name'       => 'required_with:docs|string|max:255',
+            'docs.*.mime_type'  => 'required_with:docs|string|max:100',
+            'docs.*.size'       => 'required_with:docs|integer|min:0',
         ]);
 
         // Jika docs dikirim (termasuk array kosong), update. Jika tidak dikirim, pertahankan yang lama.
