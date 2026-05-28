@@ -6,14 +6,14 @@ use Illuminate\Database\Seeder;
 
 /**
  * DatabaseSeeder — Orkestrasi semua seeder aplikasi MoneFlo.
- * Urutan penting: User → Organisasi → Transaksi → Agenda → Notification
+ * Urutan penting: Admin → Organisasi → Transaksi → Agenda → Notification
  */
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
         $this->call([
-            UserSeeder::class,         // 1. Semua user (admin + user biasa)
+            AdminSeeder::class,        // 1. User admin & contoh
             OrganisasiSeeder::class,   // 2. Organisasi & keanggotaan
             TransaksiSeeder::class,    // 3. Transaksi keuangan
             AgendaSeeder::class,       // 4. Agenda kegiatan
@@ -22,7 +22,6 @@ class DatabaseSeeder extends Seeder
 
         $this->command->info('');
         $this->command->info('🎉 Semua seeder berhasil dijalankan!');
-        $this->command->info('   Admin : moneflosupp@gmail.com  (password di backup)');
-        $this->command->info('   User  : kosmail012@gmail.com   (password di backup)');
+        $this->command->info('   Admin: moneflosupport@gmail.com / admin123');
     }
 }
