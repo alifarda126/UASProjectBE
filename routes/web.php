@@ -1,43 +1,29 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-// RUTE SEMENTARA UNTUK BACKUP DATA DARI MYSQL CLEVER CLOUD
-Route::get('/backup-rahasia-moneflo', function () {
-    // Mengambil semua nama tabel dari database lama
-    $tables = DB::select('SHOW TABLES');
-    $databaseName = DB::getDatabaseName();
-    $key = "Tables_in_" . $databaseName;
+// Route Darurat Pemindahan Data ke Storj
+Route::get('/pindah-data-rahasia', function () {
+    // 1. Ambil semua file dari folder storage lokal server Clever Cloud
+    $files = Storage::disk('local')->allFiles('public');
     
-    $sqlDump = "";
-    
-    foreach ($tables as $table) {
-        $tableName = $table->$key;
+    $pindah = 0;
+    foreach ($files as $file) {
+        // Baca isi file-nya
+        $content = Storage::disk('local')->get($file);
         
-        // Ambil struktur tabel (CREATE TABLE)
-        $createTable = DB::select("SHOW CREATE TABLE `{$tableName}`")[0]->{'Create Table'};
-        $sqlDump .= "\n\n" . $createTable . ";\n\n";
+        // Bersihkan path (menghilangkan kata 'public/' di depannya agar rapi di Storj)
+        $cleanPath = str_replace('public/', '', $file);
         
-        // Ambil data di dalam tabel
-        $rows = DB::table($tableName)->get();
-        foreach ($rows as $row) {
-            $arrayRow = (array)$row;
-            $columns = array_map(function($col) { return "`{$col}`"; }, array_keys($arrayRow));
-            $values = array_map(function($val) { 
-                if (is_null($val)) return "NULL";
-                return "'" . addslashes($val) . "'"; 
-            }, array_values($arrayRow));
-            
-            $sqlDump .= "INSERT INTO `{$tableName}` (" . implode(', ', $columns) . ") VALUES (" . implode(', ', $values) . ");\n";
-        }
+        // 2. Upload langsung ke Storj (disk s3)
+        Storage::disk('s3')->put($cleanPath, $content);
+        $pindah++;
     }
-    
-    return response($sqlDump)
-        ->header('Content-Type', 'text/plain')
-        ->header('Content-Disposition', 'attachment; filename="backup_moneflo.sql"');
+
+    return "Mantap! " . $pindah . " file berhasil dipindahkan ke Storj.";
 });
