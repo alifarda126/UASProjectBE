@@ -60,7 +60,6 @@ return [
             'endpoint'                => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => true,  // 🔴 DIKUNCI TRUE: Wajib untuk Supabase/Storj agar path upload benar
             'bucket_endpoint'         => false, // 🔴 DIKUNCI FALSE: Mencegah Laravel salah menyusun endpoint upload
-            'visibility'              => 'public', // ✅ Memastikan file yang di-upload bisa diakses publik via URL
             'throw'                   => false,
             'report'                  => false,
             
