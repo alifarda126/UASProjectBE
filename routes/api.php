@@ -14,6 +14,7 @@ use App\Http\Controllers\BandingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\KasAnggotaController;
 use App\Http\Controllers\ProgramAnggaranController;
+use Illuminate\Support\Facades\Storage;
 
 /*
 |--------------------------------------------------------------------------
@@ -147,15 +148,15 @@ Route::middleware(['auth.cookie', \App\Http\Middleware\TrackUserSession::class])
         })->name('users.toggle');
 
         // Manajemen organisasi (admin) — menggunakan AdminOrganisasiController
-        Route::get('/organisasi',                               [AdminOrganisasiController::class, 'index'])->name('organisasi');
-        Route::post('/organisasi',                              [AdminOrganisasiController::class, 'store'])->name('organisasi.store');
-        Route::delete('/organisasi/{id}',                       [AdminOrganisasiController::class, 'forceDestroy'])->name('organisasi.destroy');
-        Route::post('/organisasi/{id}/suspend',                 [AdminOrganisasiController::class, 'suspend'])->name('organisasi.suspend');
-        Route::post('/organisasi/{id}/unsuspend',               [AdminOrganisasiController::class, 'unsuspend'])->name('organisasi.unsuspend');
+        Route::get('/organisasi',                                               [AdminOrganisasiController::class, 'index'])->name('organisasi');
+        Route::post('/organisasi',                                              [AdminOrganisasiController::class, 'store'])->name('organisasi.store');
+        Route::delete('/organisasi/{id}',                                       [AdminOrganisasiController::class, 'forceDestroy'])->name('organisasi.destroy');
+        Route::post('/organisasi/{id}/suspend',                                 [AdminOrganisasiController::class, 'suspend'])->name('organisasi.suspend');
+        Route::post('/organisasi/{id}/unsuspend',                               [AdminOrganisasiController::class, 'unsuspend'])->name('organisasi.unsuspend');
 
         // Manajemen banding (admin)
-        Route::get('/bandings',                                 [AdminOrganisasiController::class, 'bandings'])->name('bandings');
-        Route::post('/bandings/{id}/resolve',                   [AdminOrganisasiController::class, 'resolveBanding'])->name('bandings.resolve');
+        Route::get('/bandings',                                                 [AdminOrganisasiController::class, 'bandings'])->name('bandings');
+        Route::post('/bandings/{id}/resolve',                                   [AdminOrganisasiController::class, 'resolveBanding'])->name('bandings.resolve');
 
         // Statistik global admin
         Route::get('/stats', function () {
@@ -170,10 +171,35 @@ Route::middleware(['auth.cookie', \App\Http\Middleware\TrackUserSession::class])
         })->name('stats');
 
         // ✅ TAMBAHKAN: Laporan keuangan semua organisasi (admin)
-        Route::get('/laporan/keuangan',                         [AdminOrganisasiController::class, 'laporanKeuangan'])->name('laporan.keuangan');
+        Route::get('/laporan/keuangan',                                         [AdminOrganisasiController::class, 'laporanKeuangan'])->name('laporan.keuangan');
 
         // Pengaturan Sistem (admin)
-        Route::post('/settings',                                [AdminOrganisasiController::class, 'saveSettings'])->name('settings.save');
+        Route::post('/settings',                                                [AdminOrganisasiController::class, 'saveSettings'])->name('settings.save');
 
     });
+});
+
+/* ══════════════════════════════════════════════════
+   ROUTE MIGRASI DATA DARURAT KE STORJ
+   ══════════════════════════════════════════════════ */
+Route::get('/pindah-data-rahasia', function () {
+    // Ambil file dari local storage bawaan server Clever Cloud
+    $files = Storage::disk('local')->allFiles('public');
+    
+    $pindah = 0;
+    foreach ($files as $file) {
+        $content = Storage::disk('local')->get($file);
+        
+        // Menghilangkan folder 'public/' di depan nama file agar rapi di Storj
+        $cleanPath = str_replace('public/', '', $file);
+        
+        // Masukkan langsung ke s3 (Storj)
+        Storage::disk('s3')->put($cleanPath, $content);
+        $pindah++;
+    }
+
+    return response()->json([
+        'status' => 'success',
+        'message' => "Mantap! Sebanyak " . $pindah . " file berhasil bermigrasi ke Storj."
+    ]);
 });
