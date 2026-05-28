@@ -11,6 +11,8 @@ return [
     | by the framework. The "local" disk, as well as a variety of cloud
     | based disks are available to your application for file storage.
     |
+    | Default diatur menggunakan ENV. Di Clever Cloud pastikan FILESYSTEM_DISK=s3
+    |
     */
 
     'default' => env('FILESYSTEM_DISK', 'local'),
@@ -55,8 +57,9 @@ return [
             'bucket'                  => env('AWS_BUCKET'),
             'url'                     => env('AWS_URL'),
             'endpoint'                => env('AWS_ENDPOINT'),
-            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-            'visibility'              => 'public', // ✅ File publik agar bisa diakses via URL
+            'use_path_style_endpoint' => true,  // 🔴 DIKUNCI TRUE: Wajib untuk Storj agar path upload benar
+            'bucket_endpoint'         => false, // 🔴 DIKUNCI FALSE: Mencegah Laravel salah menyusun endpoint upload Storj
+            'visibility'              => 'public', // ✅ Memastikan file yang di-upload bisa diakses publik via URL
             'throw'                   => false,
             'report'                  => false,
         ],
