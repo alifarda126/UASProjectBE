@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
-use ZipArchive;
 
 Route::get('/', function () {
     return view('welcome');
@@ -10,12 +9,12 @@ Route::get('/', function () {
 
 // Route Darurat: Download semua isi storage/app/public dalam bentuk ZIP
 Route::get('/download-semua-data', function () {
-    $zip = new ZipArchive;
+    $zip = new \ZipArchive;
     $zipFileName = 'backup_storage_' . date('Y-m-d_His') . '.zip';
     $zipPath = storage_path($zipFileName);
 
     // Membuka/Membuat file ZIP
-    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+    if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === TRUE) {
         // Mengambil semua file dari folder 'public' (storage/app/public)
         $files = Storage::disk('public')->allFiles();
 
