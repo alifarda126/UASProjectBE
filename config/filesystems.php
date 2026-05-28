@@ -13,7 +13,6 @@ return [
     |
     | Default diatur menggunakan ENV. Di Clever Cloud pastikan FILESYSTEM_DISK=s3
     |
-    |
     */
 
     'default' => env('FILESYSTEM_DISK', 'local'),
@@ -58,12 +57,15 @@ return [
             'bucket'                  => env('AWS_BUCKET'),
             'url'                     => env('AWS_URL'),
             'endpoint'                => env('AWS_ENDPOINT'),
-            'use_path_style_endpoint' => true,  // 🔴 DIKUNCI TRUE: Wajib untuk Supabase/Storj agar path upload benar
-            'bucket_endpoint'         => false, // 🔴 DIKUNCI FALSE: Mencegah Laravel salah menyusun endpoint upload
+            'use_path_style_endpoint' => true,  
+            'bucket_endpoint'         => false, 
             'throw'                   => false,
             'report'                  => false,
+            'version'                 => 'latest',
             
-            // 🟢 SOLUSI FIXED: Memaksa AWS SDK menggunakan signature v4 yang diwajibkan oleh Supabase
+            // 🟢 SOLUSI UTAMA: Memaksa Laravel TIDAK mengirimkan ACL apa pun ke Supabase
+            'visibility'              => null, 
+            
             'options' => [
                 'SignatureVersion' => 'v4',
             ],
