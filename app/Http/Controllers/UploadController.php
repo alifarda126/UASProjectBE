@@ -83,8 +83,9 @@ class UploadController extends Controller
                 continue;
             }
 
+            $url = Storage::disk($disk)->url($path);
             $results[] = [
-                'url'       => Storage::disk($disk)->url($path),
+                'url'       => str_starts_with($url, '/') ? asset($url) : $url,
                 'path'      => $path,
                 'name'      => $name,
                 'size'      => $size,

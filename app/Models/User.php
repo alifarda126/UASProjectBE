@@ -114,7 +114,8 @@ class User extends Authenticatable
         // URL eksternal (Google OAuth, dsb) — langsung dikembalikan
         if (str_starts_with($this->avatar, 'http')) return $this->avatar;
         // Path file lokal/S3 — generate URL via Storage facade
-        return Storage::url($this->avatar);
+        $url = Storage::url($this->avatar);
+        return str_starts_with($url, '/') ? asset($url) : $url;
     }
 
     /** Inisial nama untuk placeholder avatar */

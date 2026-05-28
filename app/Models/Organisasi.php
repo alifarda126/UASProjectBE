@@ -124,6 +124,7 @@ class Organisasi extends Model
         // URL eksternal — langsung dikembalikan
         if (str_starts_with($this->logo, 'http')) return $this->logo;
         // Path file lokal/S3 — generate URL via Storage facade
-        return Storage::url($this->logo);
+        $url = Storage::url($this->logo);
+        return str_starts_with($url, '/') ? asset($url) : $url;
     }
 }
