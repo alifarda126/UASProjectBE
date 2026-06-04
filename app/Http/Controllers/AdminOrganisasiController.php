@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AnggotaOrganisasi;
 use App\Models\BandingOrganisasi;
 use App\Models\Notification;
 use App\Models\Organisasi;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * AdminOrganisasiController — Endpoint admin untuk manajemen organisasi.
@@ -61,12 +65,55 @@ class AdminOrganisasiController extends Controller
         return response()->json(['data' => $formattedOrgs]);
     }
 
-    /** Hapus permanen organisasi (forceDelete) */
+    /** Hapus permanen organisasi (forceDelete) + cleanup user & data terkait */
     public function forceDestroy(int $id): JsonResponse
     {
         $organisasi = Organisasi::withTrashed()->findOrFail($id);
-        $organisasi->forceDelete();
-        return response()->json(['message' => 'Organisasi berhasil dihapus permanen']);
+
+        DB::beginTransaction();
+        try {
+            // 1. Ambil semua user_id yang tergabung di organisasi ini
+            $memberUserIds = AnggotaOrganisasi::where('organisasi_id', $id)->pluck('user_id')->toArray();
+
+            // 2. Hapus semua data terkait organisasi
+            $organisasi->bandings()->delete();
+            $organisasi->kasAnggota()->delete();
+            $organisasi->agendas()->delete();
+            $organisasi->transaksi()->delete();
+            // Hapus program anggaran jika ada relasinya
+            DB::table('program_anggaran')->where('organisasi_id', $id)->delete();
+            // Hapus anggota organisasi (pivot)
+            AnggotaOrganisasi::where('organisasi_id', $id)->delete();
+
+            // 3. Untuk setiap user, cek apakah masih tergabung di organisasi lain
+            foreach ($memberUserIds as $userId) {
+                $otherOrgsCount = AnggotaOrganisasi::where('user_id', $userId)->count();
+
+                if ($otherOrgsCount === 0) {
+                    // User tidak punya organisasi lain → hapus user & revoke token
+                    $user = User::find($userId);
+                    if ($user && $user->role !== 'admin') {
+                        // Revoke semua Sanctum token agar session langsung mati
+                        $user->tokens()->delete();
+                        // Hapus notifikasi user
+                        $user->notifications()->delete();
+                        // Hapus user
+                        $user->delete();
+                    }
+                }
+            }
+
+            // 4. Hapus organisasi permanen
+            $organisasi->forceDelete();
+
+            DB::commit();
+
+            return response()->json(['message' => 'Organisasi dan data terkait berhasil dihapus permanen']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal hapus organisasi #{$id}: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal menghapus organisasi: ' . $e->getMessage()], 500);
+        }
     }
 
     /** Tambah organisasi baru (admin) */
@@ -128,13 +175,24 @@ class AdminOrganisasiController extends Controller
             ]);
         }
 
-        // Kirim email
+        // Kirim email suspend ke email organisasi
         if ($organisasi->email) {
             try {
                 \Illuminate\Support\Facades\Mail::to($organisasi->email)
                     ->send(new \App\Mail\SuspendedMail($organisasi->name, $request->reason));
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error("Gagal kirim email suspend ke {$organisasi->email}: " . $e->getMessage());
+                Log::error("Gagal kirim email suspend ke {$organisasi->email}: " . $e->getMessage());
+            }
+        }
+
+        // ✅ Kirim juga ke email creator (jika berbeda dari email organisasi)
+        // Ini memastikan user Google OAuth juga menerima notifikasi
+        if ($organisasi->creator && $organisasi->creator->email !== $organisasi->email) {
+            try {
+                \Illuminate\Support\Facades\Mail::to($organisasi->creator->email)
+                    ->send(new \App\Mail\SuspendedMail($organisasi->name, $request->reason));
+            } catch (\Exception $e) {
+                Log::error("Gagal kirim email suspend ke creator {$organisasi->creator->email}: " . $e->getMessage());
             }
         }
 

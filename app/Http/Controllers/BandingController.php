@@ -76,10 +76,20 @@ class BandingController extends Controller
             return response()->json(['message' => 'Sudah ada banding yang sedang menunggu proses untuk organisasi ini'], 422);
         }
 
-        // Upload bukti (jika ada)
+        // Upload bukti (jika ada) — ke S3/Supabase agar URL persistent
         $evidencePath = null;
         if ($request->hasFile('evidence')) {
-            $evidencePath = $request->file('evidence')->store('banding-evidence', 'public');
+            $file = $request->file('evidence');
+            $disk = config('filesystems.default'); // s3 di production
+            $ext = $file->getClientOriginalExtension();
+            $safeName = \Illuminate\Support\Str::random(40) . '.' . $ext;
+            $path = $file->storeAs('banding-evidence', $safeName, ['disk' => $disk, 'visibility' => 'public']);
+
+            if ($path) {
+                $url = \Illuminate\Support\Facades\Storage::disk($disk)->url($path);
+                // Simpan URL lengkap agar accessible dari frontend
+                $evidencePath = str_starts_with($url, '/') ? asset($url) : $url;
+            }
         }
 
         $banding = BandingOrganisasi::create([

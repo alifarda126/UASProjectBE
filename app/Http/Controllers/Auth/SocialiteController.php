@@ -117,10 +117,16 @@ class SocialiteController extends Controller
             if (!$user) {
                 // Coba cari berdasarkan email (user mungkin sudah daftar manual)
                 $user = User::where('email', $googleUser->getEmail())->first();
+
+                // ✅ PENTING: Jika user ditemukan tapi terdaftar secara manual (punya password, provider bukan google),
+                // TOLAK login via Google. User harus login dengan email & password.
+                if ($user && $user->password && $user->provider !== 'google') {
+                    return redirect("{$frontendUrl}/auth/callback?error=manual_account&message=" . urlencode('Akun ini terdaftar secara manual. Silakan login menggunakan email dan kata sandi Anda.'));
+                }
             }
 
             if ($user) {
-                // Update data OAuth jika user sudah ada
+                // Update data OAuth jika user sudah ada (hanya untuk akun Google)
                 $user->update([
                     'provider'       => 'google',
                     'provider_id'    => $googleUser->getId(),
