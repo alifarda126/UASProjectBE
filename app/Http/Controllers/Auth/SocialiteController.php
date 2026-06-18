@@ -159,7 +159,9 @@ class SocialiteController extends Controller
             // Set httpOnly cookie yang berisi token (cross-domain safe)
             $cookie = $this->makeAuthCookie($token);
 
-            return redirect("{$frontendUrl}/auth/callback?status=success&role={$user->role}")
+            // Sertakan token di URL agar Safari (yang memblokir cross-site cookie via ITP)
+            // tetap bisa mengautentikasi menggunakan Authorization Bearer header sebagai fallback.
+            return redirect("{$frontendUrl}/auth/callback?status=success&role={$user->role}&_t=" . urlencode($token))
                 ->withCookie($cookie);
 
         } catch (\Exception $e) {
@@ -286,6 +288,7 @@ class SocialiteController extends Controller
 
         return response()->json([
             'message' => 'Login berhasil',
+            'token'   => $token, // Fallback untuk Safari ITP (cookie lintas domain diblokir)
             'user' => [
                 'id'       => $user->id,
                 'name'     => $user->name,
