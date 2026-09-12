@@ -22,8 +22,14 @@ class UploadController extends Controller
     private const DOC_MAX_BYTES   = 5 * 1024 * 1024;   // 5 MB
     private const MAX_FILES       = 5;
 
-    private const IMAGE_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    private const DOC_MIMES   = [
+    private const IMAGE_MIMES = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/webp',
+    ];
+
+    private const DOC_MIMES = [
         'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -44,7 +50,9 @@ class UploadController extends Controller
             'files.max'      => 'Maksimal ' . self::MAX_FILES . ' file per upload.',
         ]);
 
-        $disk    = config('filesystems.default');
+        // Paksa menggunakan disk S3 (Supabase Storage)
+        $disk = 's3';
+
         $results = [];
         $errors  = [];
 
@@ -63,29 +71,87 @@ class UploadController extends Controller
             }
 
             // Validasi ukuran sesuai tipe
-            $maxBytes = $isImage ? self::IMAGE_MAX_BYTES : self::DOC_MAX_BYTES;
+            $maxBytes = $isImage
+                ? self::IMAGE_MAX_BYTES
+                : self::DOC_MAX_BYTES;
+
             if ($size > $maxBytes) {
                 $maxLabel = $isImage ? '2MB' : '5MB';
-                $errors[] = "\"$name\": ukuran file melebihi batas $maxLabel untuk " . ($isImage ? 'gambar' : 'dokumen') . ".";
+
+                $errors[] = "\"$name\": ukuran file melebihi batas $maxLabel untuk "
+                    . ($isImage ? 'gambar' : 'dokumen') . ".";
+
                 continue;
             }
 
             // Tentukan subfolder berdasarkan tipe
-            $folder = $isImage ? 'transaksi/images' : 'transaksi/docs';
+            $folder = $isImage
+                ? 'transaksi/images'
+                : 'transaksi/docs';
 
             // Buat nama file unik agar tidak bentrok
-            $ext      = $file->getClientOriginalExtension();
-            $safeName = Str::slug(pathinfo($name, PATHINFO_FILENAME)) . '-' . Str::random(8) . '.' . $ext;
-            $path     = $file->storeAs($folder, $safeName, ['disk' => $disk, 'visibility' => 'public']);
+            $ext = $file->getClientOriginalExtension();
 
-            if (!$path) {
-                $errors[] = "\"$name\": gagal diupload, coba lagi.";
+            $safeName = Str::slug(
+                pathinfo($name, PATHINFO_FILENAME)
+            ) . '-' . Str::random(8) . '.' . $ext;
+
+            /*
+             * Upload ke Supabase S3.
+             *
+             * Dibungkus try/catch supaya jika S3 gagal,
+             * error sebenarnya tercatat di Vercel Runtime Logs.
+             */
+            try {
+                $path = $file->storeAs(
+                    $folder,
+                    $safeName,
+                    [
+                        'disk'       => $disk,
+                        'visibility' => 'public',
+                    ]
+                );
+
+                if (!$path) {
+                    \Log::error('Upload S3 gagal: storeAs mengembalikan false', [
+                        'file' => $name,
+                        'disk' => $disk,
+                    ]);
+
+                    $errors[] = "\"$name\": gagal diupload, coba lagi.";
+                    continue;
+                }
+            } catch (\Throwable $e) {
+                \Log::error('Upload S3 gagal', [
+                    'file'      => $name,
+                    'disk'      => $disk,
+                    'message'   => $e->getMessage(),
+                    'exception' => get_class($e),
+                ]);
+
+                $errors[] = "\"$name\": gagal diupload: " . $e->getMessage();
                 continue;
             }
 
-            $url = Storage::disk($disk)->url($path);
+            // Ambil URL file dari S3
+            try {
+                $url = Storage::disk($disk)->url($path);
+            } catch (\Throwable $e) {
+                \Log::error('Gagal membuat URL S3', [
+                    'file'      => $name,
+                    'path'      => $path,
+                    'message'   => $e->getMessage(),
+                    'exception' => get_class($e),
+                ]);
+
+                $errors[] = "\"$name\": file berhasil disimpan tetapi URL gagal dibuat.";
+                continue;
+            }
+
             $results[] = [
-                'url'       => str_starts_with($url, '/') ? asset($url) : $url,
+                'url'       => str_starts_with($url, '/')
+                    ? asset($url)
+                    : $url,
                 'path'      => $path,
                 'name'      => $name,
                 'size'      => $size,
@@ -94,6 +160,7 @@ class UploadController extends Controller
             ];
         }
 
+        // Semua file gagal
         if (!empty($errors) && empty($results)) {
             return response()->json([
                 'message' => 'Semua file gagal diupload.',
@@ -101,10 +168,13 @@ class UploadController extends Controller
             ], 422);
         }
 
+        // Sebagian atau semua berhasil
         return response()->json([
-            'message' => count($results) . ' file berhasil diupload.' . (!empty($errors) ? ' Beberapa file gagal.' : ''),
-            'data'    => $results,
-            'errors'  => $errors,
+            'message' => count($results)
+                . ' file berhasil diupload.'
+                . (!empty($errors) ? ' Beberapa file gagal.' : ''),
+            'data'   => $results,
+            'errors' => $errors,
         ], 201);
     }
 
@@ -119,20 +189,29 @@ class UploadController extends Controller
             'paths.*' => 'required|string',
         ]);
 
-        $disk    = config('filesystems.default');
+        // Paksa menggunakan disk S3 (Supabase Storage)
+        $disk = 's3';
+
         $deleted = 0;
 
         foreach ($request->input('paths', []) as $path) {
-            // Keamanan: pastikan path tidak keluar dari folder transaksi
-            if (!str_starts_with($path, 'transaksi/') && !str_starts_with($path, 'avatars/') && !str_starts_with($path, 'logos/')) {
+            // Keamanan: pastikan path tidak keluar dari folder yang diizinkan
+            if (
+                !str_starts_with($path, 'transaksi/')
+                && !str_starts_with($path, 'avatars/')
+                && !str_starts_with($path, 'logos/')
+            ) {
                 continue;
             }
+
             if (Storage::disk($disk)->exists($path)) {
                 Storage::disk($disk)->delete($path);
                 $deleted++;
             }
         }
 
-        return response()->json(['message' => "$deleted file berhasil dihapus."]);
+        return response()->json([
+            'message' => "$deleted file berhasil dihapus.",
+        ]);
     }
 }
