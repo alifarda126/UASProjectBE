@@ -42,19 +42,47 @@ return [
         */
 
         's3' => [
-            'driver'                  => 's3',
-            'key'                     => env('AWS_ACCESS_KEY_ID'),
-            'secret'                  => env('AWS_SECRET_ACCESS_KEY'),
-            'region'                  => env('AWS_DEFAULT_REGION'),
-            'bucket'                  => env('AWS_BUCKET'),
-            'url'                     => env('AWS_URL'),
-            'endpoint'                => env('AWS_ENDPOINT'),
+            'driver' => 's3',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Supabase S3 Credentials
+            |--------------------------------------------------------------------------
+            */
+
+            'key' => env('SUPABASE_S3_KEY'),
+
+            'secret' => env('SUPABASE_S3_SECRET'),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Supabase S3 Configuration
+            |--------------------------------------------------------------------------
+            */
+
+            'region' => env('AWS_DEFAULT_REGION'),
+
+            'bucket' => env('AWS_BUCKET'),
+
+            'url' => env('AWS_URL'),
+
+            'endpoint' => env('AWS_ENDPOINT'),
+
             'use_path_style_endpoint' => true,
 
-            // Supabase S3 tidak mendukung ACL.
-            // throw=true agar error asli muncul jika upload gagal.
-            'throw'                   => true,
-            'report'                  => true,
+            /*
+            |--------------------------------------------------------------------------
+            | Error Handling
+            |--------------------------------------------------------------------------
+            |
+            | throw=true agar error asli dari S3/Supabase
+            | dapat diketahui saat proses upload.
+            |
+            */
+
+            'throw' => true,
+
+            'report' => true,
         ],
 
     ],
@@ -66,7 +94,9 @@ return [
     */
 
     'links' => [
+
         public_path('storage') => storage_path('app/public'),
+
     ],
 
 ];
