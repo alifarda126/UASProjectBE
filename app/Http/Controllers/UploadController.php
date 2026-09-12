@@ -4,11 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
- * UploadController — Upload file bukti transaksi ke S3.
+ * UploadController — Upload file bukti transaksi ke Supabase S3.
  *
  * Batasan:
  *   Gambar (JPG/PNG/WEBP) : maks. 2 MB
@@ -18,8 +19,8 @@ use Illuminate\Support\Str;
 class UploadController extends Controller
 {
     // Limit ukuran per tipe (dalam bytes)
-    private const IMAGE_MAX_BYTES = 2 * 1024 * 1024;   // 2 MB
-    private const DOC_MAX_BYTES   = 5 * 1024 * 1024;   // 5 MB
+    private const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+    private const DOC_MAX_BYTES   = 5 * 1024 * 1024; // 5 MB
     private const MAX_FILES       = 5;
 
     private const IMAGE_MIMES = [
@@ -37,8 +38,8 @@ class UploadController extends Controller
 
     /**
      * POST /api/upload/doc
+     *
      * Upload satu atau lebih file bukti transaksi.
-     * Mengembalikan array URL file yang tersimpan di S3.
      */
     public function uploadDocs(Request $request): JsonResponse
     {
@@ -50,107 +51,238 @@ class UploadController extends Controller
             'files.max'      => 'Maksimal ' . self::MAX_FILES . ' file per upload.',
         ]);
 
-        // Paksa menggunakan disk S3 (Supabase Storage)
-        $disk = 's3';
+        $disk = Storage::disk('s3');
 
         $results = [];
         $errors  = [];
 
         foreach ($request->file('files', []) as $file) {
+
             $mime = $file->getMimeType();
             $size = $file->getSize();
             $name = $file->getClientOriginalName();
 
-            // Validasi MIME type
-            $isImage = in_array($mime, self::IMAGE_MIMES);
-            $isDoc   = in_array($mime, self::DOC_MIMES);
+            /*
+             * Validasi MIME type
+             */
+            $isImage = in_array($mime, self::IMAGE_MIMES, true);
+            $isDoc   = in_array($mime, self::DOC_MIMES, true);
 
             if (!$isImage && !$isDoc) {
-                $errors[] = "\"$name\": format tidak didukung. Gunakan JPG, PNG, WEBP, PDF, DOC, atau DOCX.";
+                $errors[] =
+                    "\"$name\": format tidak didukung. Gunakan JPG, PNG, WEBP, PDF, DOC, atau DOCX.";
+
                 continue;
             }
 
-            // Validasi ukuran sesuai tipe
+            /*
+             * Validasi ukuran
+             */
             $maxBytes = $isImage
                 ? self::IMAGE_MAX_BYTES
                 : self::DOC_MAX_BYTES;
 
             if ($size > $maxBytes) {
-                $maxLabel = $isImage ? '2MB' : '5MB';
 
-                $errors[] = "\"$name\": ukuran file melebihi batas $maxLabel untuk "
+                $maxLabel = $isImage
+                    ? '2MB'
+                    : '5MB';
+
+                $errors[] =
+                    "\"$name\": ukuran file melebihi batas $maxLabel untuk "
                     . ($isImage ? 'gambar' : 'dokumen') . ".";
 
                 continue;
             }
 
-            // Tentukan subfolder berdasarkan tipe
+            /*
+             * Tentukan folder
+             */
             $folder = $isImage
                 ? 'transaksi/images'
                 : 'transaksi/docs';
 
-            // Buat nama file unik agar tidak bentrok
-            $ext = $file->getClientOriginalExtension();
+            /*
+             * Buat nama file aman dan unik.
+             */
+            $originalExtension = strtolower(
+                $file->getClientOriginalExtension()
+            );
 
-            $safeName = Str::slug(
-                pathinfo($name, PATHINFO_FILENAME)
-            ) . '-' . Str::random(8) . '.' . $ext;
+            $originalName = pathinfo(
+                $name,
+                PATHINFO_FILENAME
+            );
+
+            $slugName = Str::slug($originalName);
 
             /*
-             * Upload ke Supabase S3.
+             * Jika nama file ternyata kosong setelah di-slug,
+             * gunakan nama default.
+             */
+            if ($slugName === '') {
+                $slugName = 'file';
+            }
+
+            $safeName =
+                $slugName
+                . '-'
+                . Str::random(8)
+                . '.'
+                . $originalExtension;
+
+            $path = $folder . '/' . $safeName;
+
+            /*
+             * Upload langsung menggunakan Laravel Filesystem.
              *
-             * Dibungkus try/catch supaya jika S3 gagal,
-             * error sebenarnya tercatat di Vercel Runtime Logs.
+             * Kita menggunakan putFileAs() secara eksplisit karena
+             * pengujian sebelumnya membuktikan bahwa:
+             *
+             * Storage::disk('s3')->put()
+             *
+             * berhasil bekerja pada environment Vercel.
              */
             try {
-                $path = $file->storeAs(
-                    $folder,
-                    $safeName,
+
+                $stream = fopen(
+                    $file->getRealPath(),
+                    'rb'
+                );
+
+                if ($stream === false) {
+                    throw new \RuntimeException(
+                        'File temporary tidak dapat dibuka.'
+                    );
+                }
+
+                try {
+
+                    $uploaded = $disk->put(
+                        $path,
+                        $stream
+                    );
+
+                } finally {
+
+                    fclose($stream);
+                }
+
+                if (!$uploaded) {
+
+                    Log::error(
+                        'Upload S3 gagal: Storage::put mengembalikan false',
+                        [
+                            'file' => $name,
+                            'path' => $path,
+                            'disk' => 's3',
+                        ]
+                    );
+
+                    $errors[] =
+                        "\"$name\": gagal diupload, coba lagi.";
+
+                    continue;
+                }
+
+            } catch (\Throwable $e) {
+
+                Log::error(
+                    'Upload S3 gagal',
                     [
-                        'disk'       => $disk,
+                        'file'      => $name,
+                        'path'      => $path,
+                        'disk'      => 's3',
+                        'message'   => $e->getMessage(),
+                        'exception' => get_class($e),
                     ]
                 );
 
-                if (!$path) {
-                    \Log::error('Upload S3 gagal: storeAs mengembalikan false', [
-                        'file' => $name,
-                        'disk' => $disk,
-                    ]);
+                $errors[] =
+                    "\"$name\": gagal diupload: "
+                    . $e->getMessage();
 
-                    $errors[] = "\"$name\": gagal diupload, coba lagi.";
+                continue;
+            }
+
+            /*
+             * Pastikan file benar-benar ada setelah upload.
+             */
+            try {
+
+                $exists = $disk->exists($path);
+
+                if (!$exists) {
+
+                    Log::error(
+                        'Upload S3 tidak ditemukan setelah write',
+                        [
+                            'file' => $name,
+                            'path' => $path,
+                        ]
+                    );
+
+                    $errors[] =
+                        "\"$name\": upload dilaporkan berhasil tetapi file tidak ditemukan di storage.";
+
                     continue;
                 }
-            } catch (\Throwable $e) {
-                \Log::error('Upload S3 gagal', [
-                    'file'      => $name,
-                    'disk'      => $disk,
-                    'message'   => $e->getMessage(),
-                    'exception' => get_class($e),
-                ]);
 
-                $errors[] = "\"$name\": gagal diupload: " . $e->getMessage();
+            } catch (\Throwable $e) {
+
+                Log::error(
+                    'Gagal memverifikasi file S3',
+                    [
+                        'file'      => $name,
+                        'path'      => $path,
+                        'message'   => $e->getMessage(),
+                        'exception' => get_class($e),
+                    ]
+                );
+
+                $errors[] =
+                    "\"$name\": file berhasil disimpan tetapi gagal diverifikasi.";
+
                 continue;
             }
 
-            // Ambil URL file dari S3
+            /*
+             * Buat URL file.
+             */
             try {
-                $url = Storage::disk($disk)->url($path);
-            } catch (\Throwable $e) {
-                \Log::error('Gagal membuat URL S3', [
-                    'file'      => $name,
-                    'path'      => $path,
-                    'message'   => $e->getMessage(),
-                    'exception' => get_class($e),
-                ]);
 
-                $errors[] = "\"$name\": file berhasil disimpan tetapi URL gagal dibuat.";
+                $url = $disk->url($path);
+
+            } catch (\Throwable $e) {
+
+                Log::error(
+                    'Gagal membuat URL S3',
+                    [
+                        'file'      => $name,
+                        'path'      => $path,
+                        'message'   => $e->getMessage(),
+                        'exception' => get_class($e),
+                    ]
+                );
+
+                /*
+                 * File sudah berhasil masuk S3.
+                 * Jangan menghapusnya hanya karena URL gagal dibuat.
+                 */
+                $errors[] =
+                    "\"$name\": file berhasil disimpan tetapi URL gagal dibuat.";
+
                 continue;
             }
 
+            /*
+             * Simpan hasil upload.
+             */
             $results[] = [
-                'url'       => str_starts_with($url, '/')
+                'url' => str_starts_with($url, '/')
                     ? asset($url)
                     : $url,
+
                 'path'      => $path,
                 'name'      => $name,
                 'size'      => $size,
@@ -159,26 +291,36 @@ class UploadController extends Controller
             ];
         }
 
-        // Semua file gagal
+        /*
+         * Semua file gagal.
+         */
         if (!empty($errors) && empty($results)) {
+
             return response()->json([
                 'message' => 'Semua file gagal diupload.',
                 'errors'  => $errors,
             ], 422);
         }
 
-        // Sebagian atau semua berhasil
+        /*
+         * Sebagian atau semua berhasil.
+         */
         return response()->json([
             'message' => count($results)
                 . ' file berhasil diupload.'
-                . (!empty($errors) ? ' Beberapa file gagal.' : ''),
+                . (!empty($errors)
+                    ? ' Beberapa file gagal.'
+                    : ''),
+
             'data'   => $results,
             'errors' => $errors,
+
         ], 201);
     }
 
     /**
      * DELETE /api/upload/doc
+     *
      * Hapus file dari S3 berdasarkan path.
      */
     public function deleteDocs(Request $request): JsonResponse
@@ -188,13 +330,16 @@ class UploadController extends Controller
             'paths.*' => 'required|string',
         ]);
 
-        // Paksa menggunakan disk S3 (Supabase Storage)
-        $disk = 's3';
+        $disk = Storage::disk('s3');
 
         $deleted = 0;
 
         foreach ($request->input('paths', []) as $path) {
-            // Keamanan: pastikan path tidak keluar dari folder yang diizinkan
+
+            /*
+             * Keamanan:
+             * hanya izinkan path dari folder aplikasi.
+             */
             if (
                 !str_starts_with($path, 'transaksi/')
                 && !str_starts_with($path, 'avatars/')
@@ -203,9 +348,25 @@ class UploadController extends Controller
                 continue;
             }
 
-            if (Storage::disk($disk)->exists($path)) {
-                Storage::disk($disk)->delete($path);
-                $deleted++;
+            try {
+
+                if ($disk->exists($path)) {
+
+                    if ($disk->delete($path)) {
+                        $deleted++;
+                    }
+                }
+
+            } catch (\Throwable $e) {
+
+                Log::error(
+                    'Gagal menghapus file S3',
+                    [
+                        'path'      => $path,
+                        'message'   => $e->getMessage(),
+                        'exception' => get_class($e),
+                    ]
+                );
             }
         }
 
