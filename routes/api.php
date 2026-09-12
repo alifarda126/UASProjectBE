@@ -87,12 +87,12 @@ Route::post(
 
 /*
 |--------------------------------------------------------------------------
-| DEBUG SUPABASE S3
+| DEBUG SUPABASE CREDENTIALS
 |--------------------------------------------------------------------------
 | TEMPORARY
 |
-| Tes koneksi S3 menggunakan AWS Signature V4.
-| Tidak upload atau menghapus file.
+| Hanya mengecek apakah environment variable AWS terbaca.
+| TIDAK menampilkan access key atau secret key.
 |
 | SETELAH DEBUG SELESAI, ROUTE INI HARUS DIHAPUS.
 |--------------------------------------------------------------------------
@@ -102,84 +102,73 @@ Route::get('/debug/supabase', function () {
 
     try {
 
-        $s3 = new \Aws\S3\S3Client([
-            'version' => 'latest',
-
-            'region' => env('AWS_DEFAULT_REGION'),
-
-            'endpoint' => env('AWS_ENDPOINT'),
-
-            'use_path_style_endpoint' => true,
-
-            'credentials' => [
-                'key' => env('AWS_ACCESS_KEY_ID'),
-                'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            ],
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Tes S3 menggunakan Signature V4
-        |--------------------------------------------------------------------------
-        |
-        | ListObjectsV2 hanya membaca isi bucket.
-        | Tidak mengupload / menghapus file.
-        |
-        */
-
-        $result = $s3->listObjectsV2([
-            'Bucket' => env('AWS_BUCKET'),
-            'MaxKeys' => 1,
-        ]);
+        $key = env('AWS_ACCESS_KEY_ID');
+        $secret = env('AWS_SECRET_ACCESS_KEY');
+        $region = env('AWS_DEFAULT_REGION');
+        $bucket = env('AWS_BUCKET');
+        $endpoint = env('AWS_ENDPOINT');
 
         return response()->json([
             'success' => true,
 
-            'message' => 'Koneksi S3 Supabase berhasil.',
+            /*
+            |--------------------------------------------------------------------------
+            | Credentials
+            |--------------------------------------------------------------------------
+            |
+            | Hanya menampilkan apakah variable tersedia
+            | dan berapa panjangnya.
+            |
+            */
 
-            'bucket' => env('AWS_BUCKET'),
+            'access_key_exists' => !empty($key),
+            'access_key_length' => $key ? strlen($key) : 0,
 
-            'region' => env('AWS_DEFAULT_REGION'),
+            'secret_key_exists' => !empty($secret),
+            'secret_key_length' => $secret ? strlen($secret) : 0,
 
-            'endpoint' => env('AWS_ENDPOINT'),
+            /*
+            |--------------------------------------------------------------------------
+            | S3 Configuration
+            |--------------------------------------------------------------------------
+            */
 
-            'object_count' => count(
-                $result['Contents'] ?? []
-            ),
+            'region' => $region,
+
+            'bucket' => $bucket,
+
+            'endpoint' => $endpoint,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Format Check
+            |--------------------------------------------------------------------------
+            */
+
+            'credentials_format' => [
+
+                'key_is_string' => is_string($key),
+
+                'secret_is_string' => is_string($secret),
+
+                'key_trimmed_length' => $key
+                    ? strlen(trim($key))
+                    : 0,
+
+                'secret_trimmed_length' => $secret
+                    ? strlen(trim($secret))
+                    : 0,
+            ],
         ]);
 
     } catch (\Throwable $e) {
 
         return response()->json([
-
             'success' => false,
 
             'exception' => get_class($e),
 
             'message' => $e->getMessage(),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Informasi AWS tanpa membocorkan credentials
-            |--------------------------------------------------------------------------
-            */
-
-            'aws_error_code' => method_exists($e, 'getAwsErrorCode')
-                ? $e->getAwsErrorCode()
-                : null,
-
-            'aws_error_type' => method_exists($e, 'getAwsErrorType')
-                ? $e->getAwsErrorType()
-                : null,
-
-            'status_code' => method_exists($e, 'getStatusCode')
-                ? $e->getStatusCode()
-                : null,
-
-            'previous' => $e->getPrevious()
-                ? $e->getPrevious()->getMessage()
-                : null,
-
         ], 500);
     }
 
@@ -481,7 +470,7 @@ Route::middleware([
         Route::delete(
             '/{kasAnggota}',
             [KasAnggotaController::class, 'destroy']
-        )->name('destroy');
+        )->name('kasAnggota.destroy');
 
     });
 
