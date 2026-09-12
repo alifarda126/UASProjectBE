@@ -18,7 +18,6 @@ use Illuminate\Support\Str;
  */
 class UploadController extends Controller
 {
-    // Limit ukuran per tipe (dalam bytes)
     private const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
     private const DOC_MAX_BYTES   = 5 * 1024 * 1024; // 5 MB
     private const MAX_FILES       = 5;
@@ -76,7 +75,7 @@ class UploadController extends Controller
             }
 
             /*
-             * Validasi ukuran
+             * Validasi ukuran file
              */
             $maxBytes = $isImage
                 ? self::IMAGE_MAX_BYTES
@@ -96,14 +95,14 @@ class UploadController extends Controller
             }
 
             /*
-             * Tentukan folder
+             * Tentukan folder berdasarkan tipe file
              */
             $folder = $isImage
                 ? 'transaksi/images'
                 : 'transaksi/docs';
 
             /*
-             * Buat nama file aman dan unik.
+             * Buat nama file aman dan unik
              */
             $originalExtension = strtolower(
                 $file->getClientOriginalExtension()
@@ -116,10 +115,6 @@ class UploadController extends Controller
 
             $slugName = Str::slug($originalName);
 
-            /*
-             * Jika nama file ternyata kosong setelah di-slug,
-             * gunakan nama default.
-             */
             if ($slugName === '') {
                 $slugName = 'file';
             }
@@ -134,14 +129,7 @@ class UploadController extends Controller
             $path = $folder . '/' . $safeName;
 
             /*
-             * Upload langsung menggunakan Laravel Filesystem.
-             *
-             * Kita menggunakan putFileAs() secara eksplisit karena
-             * pengujian sebelumnya membuktikan bahwa:
-             *
-             * Storage::disk('s3')->put()
-             *
-             * berhasil bekerja pada environment Vercel.
+             * Upload ke Supabase S3.
              */
             try {
 
@@ -206,7 +194,7 @@ class UploadController extends Controller
             }
 
             /*
-             * Pastikan file benar-benar ada setelah upload.
+             * Pastikan file benar-benar ada di S3.
              */
             try {
 
@@ -223,7 +211,7 @@ class UploadController extends Controller
                     );
 
                     $errors[] =
-                        "\"$name\": upload dilaporkan berhasil tetapi file tidak ditemukan di storage.";
+                        "\"$name\": upload berhasil tetapi file tidak ditemukan di storage.";
 
                     continue;
                 }
@@ -247,16 +235,31 @@ class UploadController extends Controller
             }
 
             /*
-             * Buat URL file.
+             * Buat SIGNED URL.
+             *
+             * Jangan menggunakan:
+             *
+             *     $disk->url($path)
+             *
+             * karena bucket Supabase S3 tidak dapat diakses
+             * secara public tanpa signature.
+             *
+             * temporaryUrl() menghasilkan URL yang memiliki
+             * signature sehingga browser dapat membuka file.
+             *
+             * URL berlaku selama 60 menit.
              */
             try {
 
-                $url = $disk->url($path);
+                $url = $disk->temporaryUrl(
+                    $path,
+                    now()->addMinutes(60)
+                );
 
             } catch (\Throwable $e) {
 
                 Log::error(
-                    'Gagal membuat URL S3',
+                    'Gagal membuat signed URL S3',
                     [
                         'file'      => $name,
                         'path'      => $path,
@@ -265,12 +268,8 @@ class UploadController extends Controller
                     ]
                 );
 
-                /*
-                 * File sudah berhasil masuk S3.
-                 * Jangan menghapusnya hanya karena URL gagal dibuat.
-                 */
                 $errors[] =
-                    "\"$name\": file berhasil disimpan tetapi URL gagal dibuat.";
+                    "\"$name\": file berhasil disimpan tetapi signed URL gagal dibuat.";
 
                 continue;
             }
@@ -279,10 +278,7 @@ class UploadController extends Controller
              * Simpan hasil upload.
              */
             $results[] = [
-                'url' => str_starts_with($url, '/')
-                    ? asset($url)
-                    : $url,
-
+                'url'       => $url,
                 'path'      => $path,
                 'name'      => $name,
                 'size'      => $size,
