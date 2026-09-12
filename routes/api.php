@@ -87,46 +87,102 @@ Route::post(
 
 /*
 |--------------------------------------------------------------------------
-| DEBUG SUPABASE
+| DEBUG SUPABASE S3
 |--------------------------------------------------------------------------
-| TEMPORARY — hanya untuk pengecekan koneksi Vercel → Supabase.
+| TEMPORARY
 |
-| Setelah masalah selesai, ROUTE INI HARUS DIHAPUS.
+| Tes koneksi S3 menggunakan AWS Signature V4.
+| Tidak upload atau menghapus file.
+|
+| SETELAH DEBUG SELESAI, ROUTE INI HARUS DIHAPUS.
 |--------------------------------------------------------------------------
 */
 
 Route::get('/debug/supabase', function () {
+
     try {
-        $endpoint = env('AWS_ENDPOINT');
 
-        if (empty($endpoint)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'AWS_ENDPOINT tidak ditemukan di environment.',
-            ], 500);
-        }
+        $s3 = new \Aws\S3\S3Client([
+            'version' => 'latest',
 
-        $response = \Illuminate\Support\Facades\Http::timeout(15)
-            ->get($endpoint);
+            'region' => env('AWS_DEFAULT_REGION'),
+
+            'endpoint' => env('AWS_ENDPOINT'),
+
+            'use_path_style_endpoint' => true,
+
+            'credentials' => [
+                'key' => env('AWS_ACCESS_KEY_ID'),
+                'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            ],
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Tes S3 menggunakan Signature V4
+        |--------------------------------------------------------------------------
+        |
+        | ListObjectsV2 hanya membaca isi bucket.
+        | Tidak mengupload / menghapus file.
+        |
+        */
+
+        $result = $s3->listObjectsV2([
+            'Bucket' => env('AWS_BUCKET'),
+            'MaxKeys' => 1,
+        ]);
 
         return response()->json([
-            'success'  => true,
-            'status'   => $response->status(),
-            'endpoint' => $endpoint,
-            'body'     => substr($response->body(), 0, 500),
+            'success' => true,
+
+            'message' => 'Koneksi S3 Supabase berhasil.',
+
+            'bucket' => env('AWS_BUCKET'),
+
+            'region' => env('AWS_DEFAULT_REGION'),
+
+            'endpoint' => env('AWS_ENDPOINT'),
+
+            'object_count' => count(
+                $result['Contents'] ?? []
+            ),
         ]);
 
     } catch (\Throwable $e) {
 
         return response()->json([
-            'success'   => false,
+
+            'success' => false,
+
             'exception' => get_class($e),
-            'message'   => $e->getMessage(),
-            'previous'  => $e->getPrevious()
+
+            'message' => $e->getMessage(),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Informasi AWS tanpa membocorkan credentials
+            |--------------------------------------------------------------------------
+            */
+
+            'aws_error_code' => method_exists($e, 'getAwsErrorCode')
+                ? $e->getAwsErrorCode()
+                : null,
+
+            'aws_error_type' => method_exists($e, 'getAwsErrorType')
+                ? $e->getAwsErrorType()
+                : null,
+
+            'status_code' => method_exists($e, 'getStatusCode')
+                ? $e->getStatusCode()
+                : null,
+
+            'previous' => $e->getPrevious()
                 ? $e->getPrevious()->getMessage()
                 : null,
+
         ], 500);
     }
+
 })->name('debug.supabase');
 
 
@@ -304,7 +360,7 @@ Route::middleware([
 
     /*
     |--------------------------------------------------------------------------
-    | Upload Dokumen/Foto ke S3
+    | Upload Dokumen / Foto ke S3
     |--------------------------------------------------------------------------
     */
 
@@ -465,9 +521,9 @@ Route::middleware([
         ->group(function () {
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Daftar semua user
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             Route::get('/users', function () {
@@ -490,9 +546,9 @@ Route::middleware([
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Toggle status aktif user
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             Route::patch(
@@ -513,9 +569,9 @@ Route::middleware([
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Manajemen organisasi
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             Route::get(
@@ -545,9 +601,9 @@ Route::middleware([
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Manajemen banding
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             Route::get(
@@ -562,20 +618,23 @@ Route::middleware([
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Statistik global admin
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             Route::get('/stats', function () {
 
                 return response()->json([
 
-                    'total_users' => \App\Models\User::count(),
+                    'total_users' =>
+                        \App\Models\User::count(),
 
-                    'total_organisasi' => \App\Models\Organisasi::count(),
+                    'total_organisasi' =>
+                        \App\Models\Organisasi::count(),
 
-                    'total_transaksi' => \App\Models\Transaksi::count(),
+                    'total_transaksi' =>
+                        \App\Models\Transaksi::count(),
 
                     'pending_transaksi' =>
                         \App\Models\Transaksi::pending()->count(),
@@ -596,9 +655,9 @@ Route::middleware([
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Laporan keuangan semua organisasi
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             Route::get(
@@ -608,9 +667,9 @@ Route::middleware([
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Pengaturan Sistem
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             Route::post(
