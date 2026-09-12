@@ -91,7 +91,9 @@ Route::post(
 |--------------------------------------------------------------------------
 | TEMPORARY
 |
-| Mengecek apakah environment variable AWS masuk ke container Vercel.
+| Mengecek apakah environment variable Supabase S3
+| masuk ke container Vercel.
+|
 | TIDAK menampilkan access key atau secret key.
 |
 | SETELAH DEBUG SELESAI, ROUTE INI HARUS DIHAPUS.
@@ -108,8 +110,8 @@ Route::get('/debug/supabase', function () {
         |--------------------------------------------------------------------------
         */
 
-        $laravelKey = env('AWS_ACCESS_KEY_ID');
-        $laravelSecret = env('AWS_SECRET_ACCESS_KEY');
+        $laravelKey = env('SUPABASE_S3_KEY');
+        $laravelSecret = env('SUPABASE_S3_SECRET');
 
         /*
         |--------------------------------------------------------------------------
@@ -117,8 +119,8 @@ Route::get('/debug/supabase', function () {
         |--------------------------------------------------------------------------
         */
 
-        $getenvKey = getenv('AWS_ACCESS_KEY_ID');
-        $getenvSecret = getenv('AWS_SECRET_ACCESS_KEY');
+        $getenvKey = getenv('SUPABASE_S3_KEY');
+        $getenvSecret = getenv('SUPABASE_S3_SECRET');
 
         /*
         |--------------------------------------------------------------------------
@@ -126,8 +128,8 @@ Route::get('/debug/supabase', function () {
         |--------------------------------------------------------------------------
         */
 
-        $serverKey = $_SERVER['AWS_ACCESS_KEY_ID'] ?? null;
-        $serverSecret = $_SERVER['AWS_SECRET_ACCESS_KEY'] ?? null;
+        $serverKey = $_SERVER['SUPABASE_S3_KEY'] ?? null;
+        $serverSecret = $_SERVER['SUPABASE_S3_SECRET'] ?? null;
 
         return response()->json([
 
