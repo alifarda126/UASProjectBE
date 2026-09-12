@@ -108,7 +108,6 @@ class UploadController extends Controller
                     $safeName,
                     [
                         'disk'       => $disk,
-                        'visibility' => 'public',
                     ]
                 );
 
