@@ -87,14 +87,13 @@ Route::post(
 
 /*
 |--------------------------------------------------------------------------
-| DEBUG SUPABASE CREDENTIALS
+| DEBUG SUPABASE S3
 |--------------------------------------------------------------------------
 | TEMPORARY
 |
-| Mengecek apakah environment variable Supabase S3
-| masuk ke container Vercel.
+| Menguji koneksi langsung dari Vercel ke Supabase S3.
 |
-| TIDAK menampilkan access key atau secret key.
+| Tidak menampilkan Access Key atau Secret Key.
 |
 | SETELAH DEBUG SELESAI, ROUTE INI HARUS DIHAPUS.
 |--------------------------------------------------------------------------
@@ -104,123 +103,45 @@ Route::get('/debug/supabase', function () {
 
     try {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Laravel env()
-        |--------------------------------------------------------------------------
-        */
+        $s3 = new \Aws\S3\S3Client([
+            'version' => 'latest',
 
-        $laravelKey = env('SUPABASE_S3_KEY');
-        $laravelSecret = env('SUPABASE_S3_SECRET');
+            'region' => env('AWS_DEFAULT_REGION'),
 
-        /*
-        |--------------------------------------------------------------------------
-        | PHP getenv()
-        |--------------------------------------------------------------------------
-        */
+            'endpoint' => env('AWS_ENDPOINT'),
 
-        $getenvKey = getenv('SUPABASE_S3_KEY');
-        $getenvSecret = getenv('SUPABASE_S3_SECRET');
+            'use_path_style_endpoint' => true,
 
-        /*
-        |--------------------------------------------------------------------------
-        | PHP $_SERVER
-        |--------------------------------------------------------------------------
-        */
-
-        $serverKey = $_SERVER['SUPABASE_S3_KEY'] ?? null;
-        $serverSecret = $_SERVER['SUPABASE_S3_SECRET'] ?? null;
-
-        return response()->json([
-
-            'success' => true,
-
-            /*
-            |--------------------------------------------------------------------------
-            | Laravel env()
-            |--------------------------------------------------------------------------
-            */
-
-            'laravel_env' => [
-
-                'key_exists' => !empty($laravelKey),
-
-                'key_length' =>
-                    is_string($laravelKey)
-                        ? strlen($laravelKey)
-                        : 0,
-
-                'secret_exists' => !empty($laravelSecret),
-
-                'secret_length' =>
-                    is_string($laravelSecret)
-                        ? strlen($laravelSecret)
-                        : 0,
-            ],
-
-            /*
-            |--------------------------------------------------------------------------
-            | PHP getenv()
-            |--------------------------------------------------------------------------
-            */
-
-            'getenv' => [
-
-                'key_exists' => !empty($getenvKey),
-
-                'key_length' =>
-                    is_string($getenvKey)
-                        ? strlen($getenvKey)
-                        : 0,
-
-                'secret_exists' => !empty($getenvSecret),
-
-                'secret_length' =>
-                    is_string($getenvSecret)
-                        ? strlen($getenvSecret)
-                        : 0,
-            ],
-
-            /*
-            |--------------------------------------------------------------------------
-            | PHP $_SERVER
-            |--------------------------------------------------------------------------
-            */
-
-            'server' => [
-
-                'key_exists' => !empty($serverKey),
-
-                'key_length' =>
-                    is_string($serverKey)
-                        ? strlen($serverKey)
-                        : 0,
-
-                'secret_exists' => !empty($serverSecret),
-
-                'secret_length' =>
-                    is_string($serverSecret)
-                        ? strlen($serverSecret)
-                        : 0,
-            ],
-
-            /*
-            |--------------------------------------------------------------------------
-            | AWS / Supabase Configuration
-            |--------------------------------------------------------------------------
-            */
-
-            'other_env' => [
-
-                'region' => env('AWS_DEFAULT_REGION'),
-
-                'bucket' => env('AWS_BUCKET'),
-
-                'endpoint' => env('AWS_ENDPOINT'),
+            'credentials' => [
+                'key' => env('SUPABASE_S3_KEY'),
+                'secret' => env('SUPABASE_S3_SECRET'),
             ],
         ]);
 
+        $result = $s3->listObjectsV2([
+            'Bucket' => env('AWS_BUCKET'),
+            'MaxKeys' => 1,
+        ]);
+
+        return response()->json([
+            'success' => true,
+
+            'message' => 'Koneksi Supabase S3 berhasil.',
+
+            'bucket' => env('AWS_BUCKET'),
+
+            'region' => env('AWS_DEFAULT_REGION'),
+
+            'endpoint' => env('AWS_ENDPOINT'),
+
+            'object_count' => count($result['Contents'] ?? []),
+        ]);
+
     } catch (\Throwable $e) {
+
+        $response = method_exists($e, 'getResponse')
+            ? $e->getResponse()
+            : null;
 
         return response()->json([
 
@@ -229,6 +150,33 @@ Route::get('/debug/supabase', function () {
             'exception' => get_class($e),
 
             'message' => $e->getMessage(),
+
+            'aws_error_code' =>
+                method_exists($e, 'getAwsErrorCode')
+                    ? $e->getAwsErrorCode()
+                    : null,
+
+            'aws_error_type' =>
+                method_exists($e, 'getAwsErrorType')
+                    ? $e->getAwsErrorType()
+                    : null,
+
+            'status_code' =>
+                method_exists($e, 'getStatusCode')
+                    ? $e->getStatusCode()
+                    : null,
+
+            'aws_request_id' =>
+                method_exists($e, 'getAwsRequestId')
+                    ? $e->getAwsRequestId()
+                    : null,
+
+            'previous' =>
+                $e->getPrevious()
+                    ? get_class($e->getPrevious()) .
+                        ': ' .
+                        $e->getPrevious()->getMessage()
+                    : null,
 
         ], 500);
     }
