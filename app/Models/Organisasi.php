@@ -36,11 +36,11 @@ class Organisasi extends Model
     ];
 
     protected $casts = [
-        'is_active'    => 'boolean',
-        'is_suspended' => 'boolean',
-        'suspended_at' => 'datetime',
+        'is_active'     => 'boolean',
+        'is_suspended'  => 'boolean',
+        'suspended_at'  => 'datetime',
         'dues_interval' => 'integer',
-        'dues_amount' => 'decimal:2',
+        'dues_amount'   => 'decimal:2',
     ];
 
     /* ──────────────────────────────────────
@@ -117,14 +117,38 @@ class Organisasi extends Model
         return $this->getTotalPemasukan() - $this->getTotalPengeluaran();
     }
 
-    /** URL logo atau null */
+    /**
+     * URL logo organisasi.
+     *
+     * Jika logo berupa URL eksternal, langsung gunakan URL tersebut.
+     * Jika berupa path file di Supabase S3, buat signed URL agar
+     * browser tetap bisa mengakses file meskipun bucket private.
+     */
     public function getLogoUrlAttribute(): ?string
     {
-        if (!$this->logo) return null;
-        // URL eksternal — langsung dikembalikan
-        if (str_starts_with($this->logo, 'http')) return $this->logo;
-        // Path file lokal/S3 — generate URL via Storage facade
-        $url = Storage::url($this->logo);
-        return str_starts_with($url, '/') ? asset($url) : $url;
+        if (!$this->logo) {
+            return null;
+        }
+
+        // Jika sudah berupa URL eksternal, langsung gunakan.
+        if (str_starts_with($this->logo, 'http')) {
+            return $this->logo;
+        }
+
+        try {
+            // Generate signed URL dari Supabase S3.
+            return Storage::disk('s3')->temporaryUrl(
+                $this->logo,
+                now()->addMinutes(60)
+            );
+        } catch (\Throwable $e) {
+            // Jika gagal generate signed URL, jangan membuat
+            // response API ikut error.
+            \Illuminate\Support\Facades\Log::error(
+                'Gagal membuat URL logo organisasi: ' . $e->getMessage()
+            );
+
+            return null;
+        }
     }
 }
