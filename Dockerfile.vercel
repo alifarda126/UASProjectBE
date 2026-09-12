@@ -35,4 +35,4 @@ RUN composer install \
 
 RUN php artisan storage:link || true
 
-CMD ["sh", "-c", "php artisan octane:frankenphp --host=0.0.0.0 --port=${PORT:-8080}"]
+CMD ["sh", "-c", "echo AWS_ACCESS_KEY_ID_SET=${AWS_ACCESS_KEY_ID:+YES}; echo AWS_SECRET_ACCESS_KEY_SET=${AWS_SECRET_ACCESS_KEY:+YES}; php artisan octane:frankenphp --host=0.0.0.0 --port=${PORT:-8080}"]
