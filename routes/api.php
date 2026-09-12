@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OrganisasiController;
@@ -105,13 +106,9 @@ Route::get('/debug/supabase', function () {
 
         $s3 = new \Aws\S3\S3Client([
             'version' => 'latest',
-
             'region' => env('AWS_DEFAULT_REGION'),
-
             'endpoint' => env('AWS_ENDPOINT'),
-
             'use_path_style_endpoint' => true,
-
             'credentials' => [
                 'key' => env('SUPABASE_S3_KEY'),
                 'secret' => env('SUPABASE_S3_SECRET'),
@@ -125,63 +122,108 @@ Route::get('/debug/supabase', function () {
 
         return response()->json([
             'success' => true,
-
             'message' => 'Koneksi Supabase S3 berhasil.',
-
             'bucket' => env('AWS_BUCKET'),
-
             'region' => env('AWS_DEFAULT_REGION'),
-
             'endpoint' => env('AWS_ENDPOINT'),
-
             'object_count' => count($result['Contents'] ?? []),
         ]);
 
     } catch (\Throwable $e) {
 
-        $response = method_exists($e, 'getResponse')
-            ? $e->getResponse()
-            : null;
-
         return response()->json([
-
             'success' => false,
-
             'exception' => get_class($e),
-
             'message' => $e->getMessage(),
-
             'aws_error_code' =>
                 method_exists($e, 'getAwsErrorCode')
                     ? $e->getAwsErrorCode()
                     : null,
-
             'aws_error_type' =>
                 method_exists($e, 'getAwsErrorType')
                     ? $e->getAwsErrorType()
                     : null,
-
             'status_code' =>
                 method_exists($e, 'getStatusCode')
                     ? $e->getStatusCode()
                     : null,
-
             'aws_request_id' =>
                 method_exists($e, 'getAwsRequestId')
                     ? $e->getAwsRequestId()
                     : null,
-
             'previous' =>
                 $e->getPrevious()
                     ? get_class($e->getPrevious()) .
                         ': ' .
                         $e->getPrevious()->getMessage()
                     : null,
-
         ], 500);
     }
 
 })->name('debug.supabase');
+
+
+/*
+|--------------------------------------------------------------------------
+| DEBUG LARAVEL FILESYSTEM → SUPABASE S3
+|--------------------------------------------------------------------------
+| TEMPORARY
+|
+| Menguji apakah Laravel Storage::disk('s3') bisa melakukan
+| write/read/delete ke Supabase S3.
+|
+| SETELAH DEBUG SELESAI, ROUTE INI HARUS DIHAPUS.
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/debug/supabase-filesystem', function () {
+
+    $path = 'debug/test-filesystem.txt';
+
+    try {
+
+        $disk = Storage::disk('s3');
+
+        $content = 'MoneFlo Laravel Filesystem S3 test ' . now()->toIso8601String();
+
+        $write = $disk->put($path, $content);
+
+        $exists = $disk->exists($path);
+
+        $read = $exists
+            ? $disk->get($path)
+            : null;
+
+        $delete = $disk->delete($path);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Laravel Filesystem → Supabase S3 berhasil.',
+            'disk' => 's3',
+            'path' => $path,
+            'write_result' => $write,
+            'exists_after_write' => $exists,
+            'read_result' => $read,
+            'delete_result' => $delete,
+        ]);
+
+    } catch (\Throwable $e) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Laravel Filesystem → Supabase S3 gagal.',
+            'exception' => get_class($e),
+            'error' => $e->getMessage(),
+            'previous' =>
+                $e->getPrevious()
+                    ? get_class($e->getPrevious()) .
+                        ': ' .
+                        $e->getPrevious()->getMessage()
+                    : null,
+        ], 500);
+    }
+
+})->name('debug.supabase.filesystem');
 
 
 /*
@@ -296,37 +338,37 @@ Route::middleware([
         ->name('organisasi.')
         ->group(function () {
 
-            Route::post(
-                '/anggota',
-                [OrganisasiController::class, 'addAnggota']
-            )->name('anggota.add');
+        Route::post(
+            '/anggota',
+            [OrganisasiController::class, 'addAnggota']
+        )->name('anggota.add');
 
-            Route::delete(
-                '/anggota/{user}',
-                [OrganisasiController::class, 'removeAnggota']
-            )->name('anggota.remove');
+        Route::delete(
+            '/anggota/{user}',
+            [OrganisasiController::class, 'removeAnggota']
+        )->name('anggota.remove');
 
-            Route::put(
-                '/anggota/{user}/role',
-                [OrganisasiController::class, 'updateRoleAnggota']
-            )->name('anggota.role');
+        Route::put(
+            '/anggota/{user}/role',
+            [OrganisasiController::class, 'updateRoleAnggota']
+        )->name('anggota.role');
 
-            Route::post(
-                '/reactivate',
-                [OrganisasiController::class, 'reactivate']
-            )->name('reactivate');
+        Route::post(
+            '/reactivate',
+            [OrganisasiController::class, 'reactivate']
+        )->name('reactivate');
 
-            Route::post(
-                '/logo',
-                [OrganisasiController::class, 'uploadLogo']
-            )->name('logo');
+        Route::post(
+            '/logo',
+            [OrganisasiController::class, 'uploadLogo']
+        )->name('logo');
 
-            Route::delete(
-                '/logo',
-                [OrganisasiController::class, 'deleteLogo']
-            )->name('logo.delete');
+        Route::delete(
+            '/logo',
+            [OrganisasiController::class, 'deleteLogo']
+        )->name('logo.delete');
 
-        });
+    });
 
 
     /*
@@ -494,17 +536,17 @@ Route::middleware([
         ->name('program-anggaran.')
         ->group(function () {
 
-            Route::get(
-                '/',
-                [ProgramAnggaranController::class, 'index']
-            )->name('index');
+        Route::get(
+            '/',
+            [ProgramAnggaranController::class, 'index']
+        )->name('index');
 
-            Route::post(
-                '/sync',
-                [ProgramAnggaranController::class, 'sync']
-            )->name('sync');
+        Route::post(
+            '/sync',
+            [ProgramAnggaranController::class, 'sync']
+        )->name('sync');
 
-        });
+    });
 
 
     /*
@@ -518,170 +560,170 @@ Route::middleware([
         ->name('admin.')
         ->group(function () {
 
-            /*
-            |--------------------------------------------------------------------------
-            | Daftar semua user
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | Daftar semua user
+        |--------------------------------------------------------------------------
+        */
 
-            Route::get('/users', function () {
+        Route::get('/users', function () {
 
-                return response()->json([
+            return response()->json([
 
-                    'data' => \App\Models\User::select([
-                        'id',
-                        'name',
-                        'email',
-                        'role',
-                        'is_active',
-                        'created_at',
-                        'last_login_at'
-                    ])
+                'data' => \App\Models\User::select([
+                    'id',
+                    'name',
+                    'email',
+                    'role',
+                    'is_active',
+                    'created_at',
+                    'last_login_at'
+                ])
                     ->orderBy('created_at', 'desc')
                     ->get()
 
+            ]);
+
+        })->name('users');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Toggle status aktif user
+        |--------------------------------------------------------------------------
+        */
+
+        Route::patch(
+            '/users/{user}/toggle-active',
+            function (\App\Models\User $user) {
+
+                $user->update([
+                    'is_active' => !$user->is_active
                 ]);
-
-            })->name('users');
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | Toggle status aktif user
-            |--------------------------------------------------------------------------
-            */
-
-            Route::patch(
-                '/users/{user}/toggle-active',
-                function (\App\Models\User $user) {
-
-                    $user->update([
-                        'is_active' => !$user->is_active
-                    ]);
-
-                    return response()->json([
-
-                        'message' =>
-                            'Status user berhasil diupdate',
-
-                        'is_active' =>
-                            $user->is_active
-
-                    ]);
-
-                }
-            )->name('users.toggle');
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | Manajemen organisasi
-            |--------------------------------------------------------------------------
-            */
-
-            Route::get(
-                '/organisasi',
-                [AdminOrganisasiController::class, 'index']
-            )->name('organisasi');
-
-            Route::post(
-                '/organisasi',
-                [AdminOrganisasiController::class, 'store']
-            )->name('organisasi.store');
-
-            Route::delete(
-                '/organisasi/{id}',
-                [AdminOrganisasiController::class, 'forceDestroy']
-            )->name('organisasi.destroy');
-
-            Route::post(
-                '/organisasi/{id}/suspend',
-                [AdminOrganisasiController::class, 'suspend']
-            )->name('organisasi.suspend');
-
-            Route::post(
-                '/organisasi/{id}/unsuspend',
-                [AdminOrganisasiController::class, 'unsuspend']
-            )->name('organisasi.unsuspend');
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | Manajemen banding
-            |--------------------------------------------------------------------------
-            */
-
-            Route::get(
-                '/bandings',
-                [AdminOrganisasiController::class, 'bandings']
-            )->name('bandings');
-
-            Route::post(
-                '/bandings/{id}/resolve',
-                [AdminOrganisasiController::class, 'resolveBanding']
-            )->name('bandings.resolve');
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | Statistik global admin
-            |--------------------------------------------------------------------------
-            */
-
-            Route::get('/stats', function () {
 
                 return response()->json([
 
-                    'total_users' =>
-                        \App\Models\User::count(),
+                    'message' =>
+                        'Status user berhasil diupdate',
 
-                    'total_organisasi' =>
-                        \App\Models\Organisasi::count(),
-
-                    'total_transaksi' =>
-                        \App\Models\Transaksi::count(),
-
-                    'pending_transaksi' =>
-                        \App\Models\Transaksi::pending()->count(),
-
-                    'total_pemasukan' =>
-                        (float) \App\Models\Transaksi::approved()
-                            ->pemasukan()
-                            ->sum('amount'),
-
-                    'total_pengeluaran' =>
-                        (float) \App\Models\Transaksi::approved()
-                            ->pengeluaran()
-                            ->sum('amount'),
+                    'is_active' =>
+                        $user->is_active
 
                 ]);
 
-            })->name('stats');
+            }
+        )->name('users.toggle');
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Laporan keuangan semua organisasi
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | Manajemen organisasi
+        |--------------------------------------------------------------------------
+        */
 
-            Route::get(
-                '/laporan/keuangan',
-                [AdminOrganisasiController::class, 'laporanKeuangan']
-            )->name('laporan.keuangan');
+        Route::get(
+            '/organisasi',
+            [AdminOrganisasiController::class, 'index']
+        )->name('organisasi');
+
+        Route::post(
+            '/organisasi',
+            [AdminOrganisasiController::class, 'store']
+        )->name('organisasi.store');
+
+        Route::delete(
+            '/organisasi/{id}',
+            [AdminOrganisasiController::class, 'forceDestroy']
+        )->name('organisasi.destroy');
+
+        Route::post(
+            '/organisasi/{id}/suspend',
+            [AdminOrganisasiController::class, 'suspend']
+        )->name('organisasi.suspend');
+
+        Route::post(
+            '/organisasi/{id}/unsuspend',
+            [AdminOrganisasiController::class, 'unsuspend']
+        )->name('organisasi.unsuspend');
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Pengaturan Sistem
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | Manajemen banding
+        |--------------------------------------------------------------------------
+        */
 
-            Route::post(
-                '/settings',
-                [AdminOrganisasiController::class, 'saveSettings']
-            )->name('settings.save');
+        Route::get(
+            '/bandings',
+            [AdminOrganisasiController::class, 'bandings']
+        )->name('bandings');
 
-        });
+        Route::post(
+            '/bandings/{id}/resolve',
+            [AdminOrganisasiController::class, 'resolveBanding']
+        )->name('bandings.resolve');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Statistik global admin
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/stats', function () {
+
+            return response()->json([
+
+                'total_users' =>
+                    \App\Models\User::count(),
+
+                'total_organisasi' =>
+                    \App\Models\Organisasi::count(),
+
+                'total_transaksi' =>
+                    \App\Models\Transaksi::count(),
+
+                'pending_transaksi' =>
+                    \App\Models\Transaksi::pending()->count(),
+
+                'total_pemasukan' =>
+                    (float) \App\Models\Transaksi::approved()
+                        ->pemasukan()
+                        ->sum('amount'),
+
+                'total_pengeluaran' =>
+                    (float) \App\Models\Transaksi::approved()
+                        ->pengeluaran()
+                        ->sum('amount'),
+
+            ]);
+
+        })->name('stats');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Laporan keuangan semua organisasi
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/laporan/keuangan',
+            [AdminOrganisasiController::class, 'laporanKeuangan']
+        )->name('laporan.keuangan');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pengaturan Sistem
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post(
+            '/settings',
+            [AdminOrganisasiController::class, 'saveSettings']
+        )->name('settings.save');
+
+    });
 
 });
