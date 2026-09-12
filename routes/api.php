@@ -91,7 +91,7 @@ Route::post(
 |--------------------------------------------------------------------------
 | TEMPORARY
 |
-| Hanya mengecek apakah environment variable AWS terbaca.
+| Mengecek apakah environment variable AWS masuk ke container Vercel.
 | TIDAK menampilkan access key atau secret key.
 |
 | SETELAH DEBUG SELESAI, ROUTE INI HARUS DIHAPUS.
@@ -102,73 +102,132 @@ Route::get('/debug/supabase', function () {
 
     try {
 
-        $key = env('AWS_ACCESS_KEY_ID');
-        $secret = env('AWS_SECRET_ACCESS_KEY');
-        $region = env('AWS_DEFAULT_REGION');
-        $bucket = env('AWS_BUCKET');
-        $endpoint = env('AWS_ENDPOINT');
+        /*
+        |--------------------------------------------------------------------------
+        | Laravel env()
+        |--------------------------------------------------------------------------
+        */
+
+        $laravelKey = env('AWS_ACCESS_KEY_ID');
+        $laravelSecret = env('AWS_SECRET_ACCESS_KEY');
+
+        /*
+        |--------------------------------------------------------------------------
+        | PHP getenv()
+        |--------------------------------------------------------------------------
+        */
+
+        $getenvKey = getenv('AWS_ACCESS_KEY_ID');
+        $getenvSecret = getenv('AWS_SECRET_ACCESS_KEY');
+
+        /*
+        |--------------------------------------------------------------------------
+        | PHP $_SERVER
+        |--------------------------------------------------------------------------
+        */
+
+        $serverKey = $_SERVER['AWS_ACCESS_KEY_ID'] ?? null;
+        $serverSecret = $_SERVER['AWS_SECRET_ACCESS_KEY'] ?? null;
 
         return response()->json([
+
             'success' => true,
 
             /*
             |--------------------------------------------------------------------------
-            | Credentials
+            | Laravel env()
             |--------------------------------------------------------------------------
-            |
-            | Hanya menampilkan apakah variable tersedia
-            | dan berapa panjangnya.
-            |
             */
 
-            'access_key_exists' => !empty($key),
-            'access_key_length' => $key ? strlen($key) : 0,
+            'laravel_env' => [
 
-            'secret_key_exists' => !empty($secret),
-            'secret_key_length' => $secret ? strlen($secret) : 0,
+                'key_exists' => !empty($laravelKey),
+
+                'key_length' =>
+                    is_string($laravelKey)
+                        ? strlen($laravelKey)
+                        : 0,
+
+                'secret_exists' => !empty($laravelSecret),
+
+                'secret_length' =>
+                    is_string($laravelSecret)
+                        ? strlen($laravelSecret)
+                        : 0,
+            ],
 
             /*
             |--------------------------------------------------------------------------
-            | S3 Configuration
+            | PHP getenv()
             |--------------------------------------------------------------------------
             */
 
-            'region' => $region,
+            'getenv' => [
 
-            'bucket' => $bucket,
+                'key_exists' => !empty($getenvKey),
 
-            'endpoint' => $endpoint,
+                'key_length' =>
+                    is_string($getenvKey)
+                        ? strlen($getenvKey)
+                        : 0,
+
+                'secret_exists' => !empty($getenvSecret),
+
+                'secret_length' =>
+                    is_string($getenvSecret)
+                        ? strlen($getenvSecret)
+                        : 0,
+            ],
 
             /*
             |--------------------------------------------------------------------------
-            | Format Check
+            | PHP $_SERVER
             |--------------------------------------------------------------------------
             */
 
-            'credentials_format' => [
+            'server' => [
 
-                'key_is_string' => is_string($key),
+                'key_exists' => !empty($serverKey),
 
-                'secret_is_string' => is_string($secret),
+                'key_length' =>
+                    is_string($serverKey)
+                        ? strlen($serverKey)
+                        : 0,
 
-                'key_trimmed_length' => $key
-                    ? strlen(trim($key))
-                    : 0,
+                'secret_exists' => !empty($serverSecret),
 
-                'secret_trimmed_length' => $secret
-                    ? strlen(trim($secret))
-                    : 0,
+                'secret_length' =>
+                    is_string($serverSecret)
+                        ? strlen($serverSecret)
+                        : 0,
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | AWS / Supabase Configuration
+            |--------------------------------------------------------------------------
+            */
+
+            'other_env' => [
+
+                'region' => env('AWS_DEFAULT_REGION'),
+
+                'bucket' => env('AWS_BUCKET'),
+
+                'endpoint' => env('AWS_ENDPOINT'),
             ],
         ]);
 
     } catch (\Throwable $e) {
 
         return response()->json([
+
             'success' => false,
 
             'exception' => get_class($e),
 
             'message' => $e->getMessage(),
+
         ], 500);
     }
 
@@ -518,6 +577,7 @@ Route::middleware([
             Route::get('/users', function () {
 
                 return response()->json([
+
                     'data' => \App\Models\User::select([
                         'id',
                         'name',
@@ -529,6 +589,7 @@ Route::middleware([
                     ])
                     ->orderBy('created_at', 'desc')
                     ->get()
+
                 ]);
 
             })->name('users');
@@ -549,8 +610,13 @@ Route::middleware([
                     ]);
 
                     return response()->json([
-                        'message' => 'Status user berhasil diupdate',
-                        'is_active' => $user->is_active
+
+                        'message' =>
+                            'Status user berhasil diupdate',
+
+                        'is_active' =>
+                            $user->is_active
+
                     ]);
 
                 }
